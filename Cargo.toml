@@ -1,0 +1,69 @@
+[package]
+name = "filemind"
+version = "2.0.0"
+edition = "2021"
+description = "The intelligent, content-aware file organizer — powered by Gemini AI. Blazing-fast Rust CLI."
+license = "MIT"
+repository = "https://github.com/theoxfaber/filemind"
+keywords = ["ai", "files", "organizer", "cli", "gemini"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "filemind"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for Gemini API
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Terminal UI
+indicatif = { version = "0.17", features = ["rayon"] }
+console = "0.15"
+colored = "2"
+
+# File hashing (MD5 for dedup)
+md5 = "0.7"
+
+# Zip creation
+zip = "2"
+
+# PDF text extraction (pure Rust, no tesseract dependency)
+pdf-extract = "0.7"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Environment variables / .env loading
+dotenvy = "0.15"
+
+# Regex for JSON extraction from Gemini responses
+regex = "1"
+
+# Ignore (for file walking with .gitignore support)
+ignore = "0.4"
+
+# dirs for home dir resolution
+dirs = "5"
+
+# Recursive directory walking
+walkdir = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

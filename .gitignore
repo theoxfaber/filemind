@@ -1,8 +1,27 @@
-venv/
-uploads/
-output/
-*.zip
-__pycache__/
-.DS_Store
-*.log
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# Environment
 .env
+
+# Python leftovers (legacy)
+__pycache__/
+*.py[cod]
+venv/
+*.egg-info/
+dist/
+build/
+
+# Output / uploads / zips
+output/
+uploads/
+*.zip
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp

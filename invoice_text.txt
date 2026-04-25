@@ -1,7 +1,0 @@
-INVOICE #INV-2024-001
-Date: March 28, 2026
-Bill To: John Doe
-Description: Software Development Services for Month of March
-Amount Due: $5000.00
-Please remit payment within 30 days.
-Thank you for your business!
