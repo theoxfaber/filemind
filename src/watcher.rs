@@ -17,6 +17,7 @@ use filemind::error::{FileMindError, Result};
 /// Watch `dir` indefinitely, organizing new files as they appear.
 ///
 /// Blocks the current thread until the process receives SIGINT/SIGTERM.
+/// Uses the configurable debounce interval from config.general.debounce_ms.
 pub async fn watch(dir: &Path, config: Arc<Config>) -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<PathBuf>(64);
 
@@ -49,10 +50,11 @@ pub async fn watch(dir: &Path, config: Arc<Config>) -> Result<()> {
     );
 
     let output_dir = config.effective_output_dir();
+    let debounce = Duration::from_millis(config.general.debounce_ms);
 
     while let Some(new_file) = rx.recv().await {
-        // Small debounce: wait briefly in case more events arrive
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Configurable debounce: wait briefly in case more events arrive
+        tokio::time::sleep(debounce).await;
 
         println!(
             "  {} new file: {}",
@@ -60,8 +62,6 @@ pub async fn watch(dir: &Path, config: Arc<Config>) -> Result<()> {
             new_file.display().to_string().white()
         );
 
-        // Create a synthetic single-file input dir pointing at the parent
-        // and let the engine skip all non-matching files via the dedup check.
         let parent = new_file.parent().unwrap_or(dir).to_path_buf();
 
         let opts = PipelineOptions {
@@ -74,6 +74,8 @@ pub async fn watch(dir: &Path, config: Arc<Config>) -> Result<()> {
             min_confidence: config.general.min_confidence,
             conflict: config.general.conflict.clone(),
             copy: config.general.copy,
+            output_format: filemind::config::OutputFormat::Human,
+            no_ignore: false,
         };
 
         match engine_run(opts, Arc::clone(&config)).await {

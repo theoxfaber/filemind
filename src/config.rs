@@ -1,4 +1,4 @@
-//! TOML configuration loader and rule merging.
+//! TOML configuration loader, rule merging, and runtime parameter resolution.
 //!
 //! FileMind looks for a config file at:
 //!   - `$FILEMIND_CONFIG` (env override)
@@ -29,7 +29,7 @@ pub struct Config {
 
 // ─── General settings ────────────────────────────────────────────────────────
 
-/// Global runtime parameters.
+/// Global runtime parameters — all tunable, no magic numbers.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GeneralConfig {
     /// Default output directory.  Supports `~` expansion.
@@ -55,6 +55,18 @@ pub struct GeneralConfig {
     /// Copy files instead of moving them (default: copy).
     #[serde(default = "default_true")]
     pub copy: bool,
+
+    /// Watcher debounce interval in milliseconds.
+    #[serde(default = "default_debounce_ms")]
+    pub debounce_ms: u64,
+
+    /// Maximum bytes of text extracted from any single file.
+    #[serde(default = "default_extract_bytes")]
+    pub extract_bytes: usize,
+
+    /// Partial hash window size in bytes (for dedup size-bucketing).
+    #[serde(default = "default_max_hash_bytes")]
+    pub max_hash_bytes: usize,
 }
 
 impl Default for GeneralConfig {
@@ -66,6 +78,9 @@ impl Default for GeneralConfig {
             min_confidence: default_min_confidence(),
             conflict: ConflictStrategy::default(),
             copy: true,
+            debounce_ms: default_debounce_ms(),
+            extract_bytes: default_extract_bytes(),
+            max_hash_bytes: default_max_hash_bytes(),
         }
     }
 }
@@ -81,6 +96,51 @@ fn default_min_confidence() -> f32 {
 }
 fn default_true() -> bool {
     true
+}
+fn default_debounce_ms() -> u64 {
+    200
+}
+fn default_extract_bytes() -> usize {
+    4096
+}
+fn default_max_hash_bytes() -> usize {
+    65536
+}
+
+// ─── Output format ───────────────────────────────────────────────────────────
+
+/// Machine-readable output format for pipeline composability.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// Default human-readable terminal output.
+    #[default]
+    Human,
+    /// Newline-delimited JSON (one object per line).
+    Json,
+    /// CSV with header row.
+    Csv,
+}
+
+impl std::str::FromStr for OutputFormat {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "human" => Ok(OutputFormat::Human),
+            "json" => Ok(OutputFormat::Json),
+            "csv" => Ok(OutputFormat::Csv),
+            other => Err(format!("unknown output format: '{other}' (expected: human, json, csv)")),
+        }
+    }
+}
+
+impl std::fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputFormat::Human => write!(f, "human"),
+            OutputFormat::Json => write!(f, "json"),
+            OutputFormat::Csv => write!(f, "csv"),
+        }
+    }
 }
 
 // ─── Conflict strategy ───────────────────────────────────────────────────────
@@ -122,6 +182,9 @@ pub struct KeywordEntry {
     pub word: String,
     /// Relative weight — higher means stronger signal.
     pub weight: f32,
+    /// Optional human-readable note explaining why this keyword exists.
+    #[serde(default)]
+    pub note: Option<String>,
 }
 
 // ─── Config loading ──────────────────────────────────────────────────────────
@@ -178,6 +241,71 @@ impl Config {
         }
         category.to_string()
     }
+
+    /// Add a keyword to a category in the user config file.
+    ///
+    /// Reads the current file, parses it, appends the keyword, and writes back.
+    pub fn add_keyword_to_file(
+        config_path: &Path,
+        category: &str,
+        word: &str,
+        weight: f32,
+    ) -> Result<()> {
+        let mut cfg = if config_path.exists() {
+            let raw = std::fs::read_to_string(config_path).map_err(FileMindError::Io)?;
+            toml::from_str::<Config>(&raw)?
+        } else {
+            Config::default()
+        };
+
+        let cat_cfg = cfg.categories.entry(category.to_string()).or_default();
+        let kws = cat_cfg.keywords.get_or_insert_with(Vec::new);
+        kws.push(KeywordEntry {
+            word: word.to_string(),
+            weight,
+            note: None,
+        });
+
+        let toml_str = toml::to_string_pretty(&cfg)?;
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent).map_err(FileMindError::Io)?;
+        }
+        std::fs::write(config_path, toml_str).map_err(FileMindError::Io)?;
+        Ok(())
+    }
+
+    /// Remove a keyword from a category in the user config file.
+    ///
+    /// Returns `true` if the keyword was found and removed.
+    pub fn remove_keyword_from_file(
+        config_path: &Path,
+        category: &str,
+        word: &str,
+    ) -> Result<bool> {
+        if !config_path.exists() {
+            return Ok(false);
+        }
+        let raw = std::fs::read_to_string(config_path).map_err(FileMindError::Io)?;
+        let mut cfg: Config = toml::from_str(&raw)?;
+
+        let removed = if let Some(cat_cfg) = cfg.categories.get_mut(category) {
+            if let Some(kws) = cat_cfg.keywords.as_mut() {
+                let before = kws.len();
+                kws.retain(|k| k.word.to_lowercase() != word.to_lowercase());
+                kws.len() < before
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if removed {
+            let toml_str = toml::to_string_pretty(&cfg)?;
+            std::fs::write(config_path, toml_str).map_err(FileMindError::Io)?;
+        }
+        Ok(removed)
+    }
 }
 
 /// Expands a leading `~` to the user's home directory.
@@ -202,6 +330,9 @@ mod tests {
         assert_eq!(cfg.general.concurrency, 4);
         assert!((cfg.general.min_confidence - 0.50).abs() < f32::EPSILON);
         assert_eq!(cfg.general.conflict, ConflictStrategy::RenameNew);
+        assert_eq!(cfg.general.debounce_ms, 200);
+        assert_eq!(cfg.general.extract_bytes, 4096);
+        assert_eq!(cfg.general.max_hash_bytes, 65536);
     }
 
     #[test]
@@ -213,6 +344,9 @@ smart_rename = true
 concurrency = 8
 min_confidence = 0.6
 conflict = "skip"
+debounce_ms = 300
+extract_bytes = 8192
+max_hash_bytes = 131072
 
 [categories.invoices]
 output_folder = "Finance/Invoices"
@@ -224,11 +358,20 @@ keywords = [
         let cfg: Config = toml::from_str(toml_str).expect("parse failed");
         assert_eq!(cfg.general.concurrency, 8);
         assert_eq!(cfg.general.conflict, ConflictStrategy::Skip);
+        assert_eq!(cfg.general.debounce_ms, 300);
+        assert_eq!(cfg.general.extract_bytes, 8192);
+        assert_eq!(cfg.general.max_hash_bytes, 131072);
         let inv = cfg.categories.get("invoices").expect("no invoices key");
         assert_eq!(inv.output_folder.as_deref(), Some("Finance/Invoices"));
-        let kws = inv.keywords.as_ref().unwrap();
+        let kws = inv.keywords.as_ref().expect("no keywords");
         assert_eq!(kws.len(), 2);
         assert_eq!(kws[0].word, "GST");
+
+        // Roundtrip: serialize and re-parse
+        let serialized = toml::to_string_pretty(&cfg).expect("serialize failed");
+        let cfg2: Config = toml::from_str(&serialized).expect("re-parse failed");
+        assert_eq!(cfg2.general.concurrency, cfg.general.concurrency);
+        assert_eq!(cfg2.general.debounce_ms, cfg.general.debounce_ms);
     }
 
     #[test]
@@ -242,5 +385,24 @@ keywords = [
         let expanded = expand_tilde("~/foo/bar");
         assert!(expanded.to_string_lossy().contains("foo/bar"));
         assert!(!expanded.to_string_lossy().starts_with('~'));
+    }
+
+    #[test]
+    fn conflict_strategy_deserialize() {
+        let cases = [
+            ("\"skip\"", ConflictStrategy::Skip),
+            ("\"overwrite\"", ConflictStrategy::Overwrite),
+            ("\"rename_new\"", ConflictStrategy::RenameNew),
+            ("\"rename_existing\"", ConflictStrategy::RenameExisting),
+        ];
+        for (input, expected) in cases {
+            let parsed: ConflictStrategy =
+                toml::from_str(&format!("conflict = {input}\n"))
+                    .map(|c: std::collections::HashMap<String, ConflictStrategy>| {
+                        c.into_values().next().unwrap()
+                    })
+                    .expect("parse failed");
+            assert_eq!(parsed, expected, "failed for input: {input}");
+        }
     }
 }

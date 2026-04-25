@@ -9,17 +9,16 @@ use std::path::Path;
 
 use crate::error::{FileMindError, Result};
 
-/// Maximum bytes of text extracted from any single file.
-const MAX_EXTRACT_BYTES: usize = 4096;
+/// Default maximum bytes of text extracted when no config is provided.
+const DEFAULT_EXTRACT_BYTES: usize = 4096;
 
-/// Reads up to [`MAX_EXTRACT_BYTES`] of the first 16 raw bytes for magic
-/// byte detection without a full file read.
+/// Reads up to this many raw bytes from the start for magic byte detection.
 const MAGIC_READ_BYTES: usize = 16;
 
 /// Result of content extraction for a single file.
 #[derive(Debug, Default, Clone)]
 pub struct Extracted {
-    /// Raw text content (up to 4 KB).
+    /// Raw text content (up to configured limit).
     pub text: String,
     /// First 16 raw bytes (for magic-byte detection in the classifier).
     pub magic: Vec<u8>,
@@ -27,11 +26,19 @@ pub struct Extracted {
     pub has_text: bool,
 }
 
-/// Extract content from `path`.
+/// Extract content from `path` using the default extraction limit.
 ///
 /// Never panics — unreadable or binary files yield an [`Extracted`] with
 /// `has_text = false` and empty `text`.
 pub fn extract(path: &Path) -> Result<Extracted> {
+    extract_with_limit(path, DEFAULT_EXTRACT_BYTES)
+}
+
+/// Extract content from `path` with a configurable byte limit.
+///
+/// `max_bytes` controls the maximum amount of text extracted. This allows
+/// the extraction limit to be tuned via config rather than a hardcoded constant.
+pub fn extract_with_limit(path: &Path, max_bytes: usize) -> Result<Extracted> {
     let magic = read_magic(path)?;
 
     let ext = path
@@ -41,17 +48,17 @@ pub fn extract(path: &Path) -> Result<Extracted> {
         .to_lowercase();
 
     let text = match ext.as_str() {
-        "pdf" => extract_pdf(path),
+        "pdf" => extract_pdf(path, max_bytes),
         // All UTF-8 text variants share the same reader
-        "txt" | "md" | "markdown" | "rst" | "log" | "org" => read_text(path),
+        "txt" | "md" | "markdown" | "rst" | "log" | "org" => read_text(path, max_bytes),
         "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "go" | "java" | "c" | "cpp" | "h" | "hpp"
         | "cs" | "rb" | "swift" | "kt" | "scala" | "r" | "lua" | "php" | "sh" | "bash" | "zsh"
-        | "fish" | "ps1" | "bat" => read_text(path),
+        | "fish" | "ps1" | "bat" => read_text(path, max_bytes),
         "json" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf" | "xml" | "csv" | "tsv"
-        | "html" | "htm" | "css" | "sql" => read_text(path),
+        | "html" | "htm" | "css" | "sql" => read_text(path, max_bytes),
         _ => {
             // Try to read as UTF-8 anyway; silently return empty on failure
-            read_text_optional(path)
+            read_text_optional(path, max_bytes)
         }
     };
 
@@ -75,11 +82,11 @@ fn read_magic(path: &Path) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-/// Read a text file up to [`MAX_EXTRACT_BYTES`], replacing invalid UTF-8.
-fn read_text(path: &Path) -> String {
+/// Read a text file up to `max_bytes`, replacing invalid UTF-8.
+fn read_text(path: &Path, max_bytes: usize) -> String {
     match std::fs::read(path) {
         Ok(bytes) => {
-            let s = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_EXTRACT_BYTES)]);
+            let s = String::from_utf8_lossy(&bytes[..bytes.len().min(max_bytes)]);
             s.into_owned()
         }
         Err(_) => String::new(),
@@ -87,7 +94,7 @@ fn read_text(path: &Path) -> String {
 }
 
 /// Like [`read_text`] but returns empty string on any error (for unknown types).
-fn read_text_optional(path: &Path) -> String {
+fn read_text_optional(path: &Path, max_bytes: usize) -> String {
     match std::fs::read(path) {
         Ok(bytes) => {
             // Quick binary check: if >10% of the first 512 bytes are non-printable
@@ -100,7 +107,7 @@ fn read_text_optional(path: &Path) -> String {
             if !sample.is_empty() && non_printable * 10 > sample.len() {
                 return String::new();
             }
-            let s = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_EXTRACT_BYTES)]);
+            let s = String::from_utf8_lossy(&bytes[..bytes.len().min(max_bytes)]);
             s.into_owned()
         }
         Err(_) => String::new(),
@@ -108,12 +115,12 @@ fn read_text_optional(path: &Path) -> String {
 }
 
 /// Extract text from a PDF using the pure-Rust `pdf-extract` crate.
-fn extract_pdf(path: &Path) -> String {
+fn extract_pdf(path: &Path, max_bytes: usize) -> String {
     match pdf_extract::extract_text(path) {
         Ok(t) => {
             let trimmed = t.trim().to_string();
-            if trimmed.len() > MAX_EXTRACT_BYTES {
-                trimmed[..MAX_EXTRACT_BYTES].to_string()
+            if trimmed.len() > max_bytes {
+                trimmed[..max_bytes].to_string()
             } else {
                 trimmed
             }
@@ -166,5 +173,18 @@ mod tests {
         let result = extract(f.path()).unwrap();
         assert!(!result.magic.is_empty());
         assert_eq!(&result.magic[..4], b"%PDF");
+    }
+
+    #[test]
+    fn configurable_extract_limit() {
+        let mut f = NamedTempFile::with_suffix(".txt").unwrap();
+        let content = "a".repeat(10000);
+        f.write_all(content.as_bytes()).unwrap();
+
+        let result = extract_with_limit(f.path(), 100).unwrap();
+        assert_eq!(result.text.len(), 100);
+
+        let result2 = extract_with_limit(f.path(), 5000).unwrap();
+        assert_eq!(result2.text.len(), 5000);
     }
 }

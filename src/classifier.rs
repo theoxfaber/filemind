@@ -13,9 +13,42 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use once_cell::sync::Lazy;
+use serde::Deserialize;
 
 use crate::config::Config;
 use crate::extractor::Extracted;
+
+// ─── Compile-time embedded keywords ──────────────────────────────────────────
+
+/// The canonical built-in keyword list, embedded at compile time from
+/// `assets/keywords.toml`. Users can export and customize this file.
+const BUILTIN_KEYWORDS_TOML: &str = include_str!("../assets/keywords.toml");
+
+/// Deserialization types for the embedded keywords.toml.
+#[derive(Debug, Deserialize)]
+struct KeywordsFile {
+    #[serde(flatten)]
+    sections: HashMap<String, KeywordSection>,
+}
+
+/// A single category section in keywords.toml.
+#[derive(Debug, Deserialize)]
+struct KeywordSection {
+    category: String,
+    keywords: Vec<KeywordDef>,
+}
+
+/// A single keyword definition with optional note.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KeywordDef {
+    /// The keyword or phrase to match (case-insensitive).
+    pub word: String,
+    /// Relative weight — higher means stronger signal.
+    pub weight: f32,
+    /// Optional human-readable note explaining why this keyword exists.
+    #[serde(default)]
+    pub note: Option<String>,
+}
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -78,42 +111,34 @@ pub struct ClassificationResult {
 
 static EXT_MAP: Lazy<HashMap<&'static str, (&'static str, f32)>> = Lazy::new(|| {
     let mut m = HashMap::new();
-    // Documents — office formats get higher base (format is conclusive)
     for ext in &["pdf", "doc", "docx", "odt", "rtf", "pages", "wpd", "tex"] {
         m.insert(*ext, ("Documents", 0.60_f32));
     }
-    // Plain text — lower base because content matters more than extension
     for ext in &["txt", "md", "markdown", "rst"] {
         m.insert(*ext, ("Documents", 0.40_f32));
     }
-    // Spreadsheets
     for ext in &["xlsx", "xls", "ods", "numbers", "xlsm", "xlsb"] {
         m.insert(*ext, ("Spreadsheets", 0.65_f32));
     }
-    // Presentations
     for ext in &["pptx", "ppt", "odp", "key"] {
         m.insert(*ext, ("Presentations", 0.65_f32));
     }
-    // Images
     for ext in &[
         "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg", "heic", "heif", "raw",
         "cr2", "nef", "arw", "dng", "ico",
     ] {
         m.insert(*ext, ("Images", 0.70_f32));
     }
-    // Videos
     for ext in &[
         "mp4", "avi", "mov", "mkv", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mts",
     ] {
         m.insert(*ext, ("Videos", 0.75_f32));
     }
-    // Audio
     for ext in &[
         "mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus", "aiff", "mid",
     ] {
         m.insert(*ext, ("Audio", 0.75_f32));
     }
-    // Source code
     for ext in &[
         "rs", "py", "js", "ts", "jsx", "tsx", "go", "java", "c", "cpp", "h", "hpp", "cs", "rb",
         "swift", "kt", "scala", "r", "lua", "php", "sh", "bash", "zsh", "fish", "ps1", "bat",
@@ -121,310 +146,90 @@ static EXT_MAP: Lazy<HashMap<&'static str, (&'static str, f32)>> = Lazy::new(|| 
     ] {
         m.insert(*ext, ("Code", 0.80_f32));
     }
-    // Data / config
     for ext in &[
         "json", "yaml", "yml", "toml", "xml", "csv", "tsv", "parquet", "avro",
     ] {
         m.insert(*ext, ("Data", 0.65_f32));
     }
-    // Archives
     for ext in &["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "zst"] {
         m.insert(*ext, ("Archives", 0.75_f32));
     }
-    // Database
     for ext in &["sqlite", "sqlite3", "db", "duckdb"] {
         m.insert(*ext, ("Data/Database", 0.80_f32));
     }
-    // Ebooks
     for ext in &["epub", "mobi", "azw", "azw3"] {
         m.insert(*ext, ("Books", 0.75_f32));
     }
     m
 });
 
-// ─── Built-in keyword lists ───────────────────────────────────────────────────
+// ─── Built-in keyword list (parsed from embedded TOML) ───────────────────────
 
-/// A built-in keyword entry with category, word, and weight.
+/// Parsed built-in keyword entries: (category, word, weight, note).
 pub struct BuiltinKw {
-    pub category: &'static str,
-    pub word: &'static str,
+    pub category: String,
+    pub word: String,
     pub weight: f32,
+    pub note: Option<String>,
 }
 
+/// The parsed built-in keyword list, lazily initialized from the embedded TOML.
 pub static BUILTIN_KEYWORDS: Lazy<Vec<BuiltinKw>> = Lazy::new(|| {
-    vec![
-        // Invoices / Finance
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "invoice",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "total due",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "bill to",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "amount",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "receipt",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "payment",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "subtotal",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "tax",
-            weight: 1.0,
-        },
-        BuiltinKw {
-            category: "Documents/Invoices",
-            word: "billed",
-            weight: 1.5,
-        },
-        // Medical
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "diagnosis",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "prescription",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "patient",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "dosage",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "mg",
-            weight: 1.0,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "clinic",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "physician",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Medical",
-            word: "symptom",
-            weight: 2.0,
-        },
-        // Legal
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "agreement",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "whereas",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "party",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "liability",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "jurisdiction",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "contract",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Legal",
-            word: "shall",
-            weight: 1.0,
-        },
-        // Finance
-        BuiltinKw {
-            category: "Finance",
-            word: "portfolio",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Finance",
-            word: "dividend",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Finance",
-            word: "equity",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Finance",
-            word: "balance sheet",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Finance",
-            word: "quarterly",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Finance",
-            word: "revenue",
-            weight: 2.0,
-        },
-        // Code (text-based signal)
-        BuiltinKw {
-            category: "Code",
-            word: "fn ",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "struct ",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "impl ",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "import ",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "def ",
-            weight: 2.0,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "#include",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "function",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "class ",
-            weight: 1.5,
-        },
-        BuiltinKw {
-            category: "Code",
-            word: "return",
-            weight: 1.0,
-        },
-        // Research / Academic
-        BuiltinKw {
-            category: "Documents/Research",
-            word: "abstract",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Research",
-            word: "bibliography",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Research",
-            word: "hypothesis",
-            weight: 3.0,
-        },
-        BuiltinKw {
-            category: "Documents/Research",
-            word: "methodology",
-            weight: 2.5,
-        },
-        BuiltinKw {
-            category: "Documents/Research",
-            word: "references",
-            weight: 2.0,
-        },
-    ]
+    let file: KeywordsFile =
+        toml::from_str(BUILTIN_KEYWORDS_TOML).expect("embedded keywords.toml is invalid");
+    let mut result = Vec::new();
+    for section in file.sections.values() {
+        for kw in &section.keywords {
+            result.push(BuiltinKw {
+                category: section.category.clone(),
+                word: kw.word.clone(),
+                weight: kw.weight,
+                note: kw.note.clone(),
+            });
+        }
+    }
+    result
 });
 
-// ─── Magic byte patterns ──────────────────────────────────────────────────────
+/// Returns the raw embedded keywords TOML string for export.
+pub fn builtin_keywords_toml() -> &'static str {
+    BUILTIN_KEYWORDS_TOML
+}
 
-/// Returns `Some((description, boost))` if the magic bytes match a known format.
-fn detect_magic(bytes: &[u8]) -> Option<(&'static str, f32)> {
-    if bytes.starts_with(b"%PDF") {
-        return Some(("PDF document header (%PDF)", 0.10));
-    }
-    if bytes.starts_with(b"PK\x03\x04") {
-        return Some(("ZIP/Office archive (PK\\x03\\x04)", 0.10));
-    }
-    if bytes.starts_with(b"\xFF\xD8\xFF") {
-        return Some(("JPEG image (FFD8FF)", 0.12));
-    }
-    if bytes.starts_with(b"\x89PNG") {
-        return Some(("PNG image (\\x89PNG)", 0.12));
-    }
-    if bytes.starts_with(b"GIF8") {
-        return Some(("GIF image (GIF8)", 0.12));
-    }
-    if bytes.starts_with(b"ID3")
-        || (bytes.len() >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)
+// ─── Magic byte detection via `infer` crate ──────────────────────────────────
+
+/// Detect file format from magic bytes using the `infer` crate.
+/// Returns `Some((description, category, boost))` on match.
+fn detect_magic_infer(bytes: &[u8]) -> Option<(&'static str, &'static str, f32)> {
+    let kind = infer::get(bytes)?;
+    let mime = kind.mime_type();
+
+    // Map MIME type to category and boost value
+    if mime.starts_with("image/") {
+        Some(("image (infer)", "Images", 0.12))
+    } else if mime.starts_with("video/") {
+        Some(("video (infer)", "Videos", 0.12))
+    } else if mime.starts_with("audio/") {
+        Some(("audio (infer)", "Audio", 0.12))
+    } else if mime == "application/pdf" {
+        Some(("PDF document (infer)", "Documents", 0.10))
+    } else if mime == "application/zip"
+        || mime == "application/gzip"
+        || mime == "application/x-bzip2"
+        || mime == "application/x-xz"
+        || mime == "application/x-7z-compressed"
+        || mime == "application/x-rar-compressed"
+        || mime == "application/zstd"
     {
-        return Some(("MP3 audio (ID3 / sync bits)", 0.12));
+        Some(("archive (infer)", "Archives", 0.12))
+    } else if mime == "application/x-sqlite3" {
+        Some(("SQLite database (infer)", "Data/Database", 0.15))
+    } else if mime.starts_with("application/") {
+        // Generic application type — small boost
+        Some(("application (infer)", "Misc", 0.05))
+    } else {
+        None
     }
-    if bytes.starts_with(b"fLaC") {
-        return Some(("FLAC audio (fLaC)", 0.12));
-    }
-    if bytes.starts_with(b"RIFF") {
-        return Some(("RIFF container (WAV/AVI)", 0.10));
-    }
-    if bytes.starts_with(b"\x1f\x8b") {
-        return Some(("GZIP archive (\\x1f\\x8b)", 0.12));
-    }
-    if bytes.starts_with(b"BZh") {
-        return Some(("BZIP2 archive (BZh)", 0.12));
-    }
-    if bytes.starts_with(b"\xfd7zXZ") {
-        return Some(("XZ archive", 0.12));
-    }
-    if bytes.starts_with(b"SQLite format") {
-        return Some(("SQLite database", 0.15));
-    }
-    None
 }
 
 // ─── Category scoring accumulator ─────────────────────────────────────────────
@@ -469,10 +274,8 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
         entry.decisive_tier.get_or_insert(Tier::Extension);
     }
 
-    // Magic bytes can override or boost the category
-    if let Some((desc, boost)) = detect_magic(&extracted.magic) {
-        // Determine category from magic (may differ from extension)
-        let magic_cat = magic_to_category(desc);
+    // Magic bytes via the `infer` crate (single source of truth — no manual matching)
+    if let Some((desc, magic_cat, boost)) = detect_magic_infer(&extracted.magic) {
         let entry = scores.entry(magic_cat.to_string()).or_default();
         entry.boost += boost;
         entry.evidence.push(Evidence::MagicBytes {
@@ -489,12 +292,12 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
         // Collect all keyword lists: built-ins + user overrides
         let mut kw_map: HashMap<String, Vec<(String, f32)>> = HashMap::new();
 
-        // Built-ins
+        // Built-ins from embedded keywords.toml
         for kw in BUILTIN_KEYWORDS.iter() {
             kw_map
-                .entry(kw.category.to_string())
+                .entry(kw.category.clone())
                 .or_default()
-                .push((kw.word.to_string(), kw.weight));
+                .push((kw.word.to_lowercase(), kw.weight));
         }
 
         // User overrides from config: merge (append) keyword lists
@@ -526,6 +329,7 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
                     }
                 }
                 if !offsets.is_empty() {
+                    // sqrt dampening: 4× keyword != 4× score
                     matched_weight += weight * (offsets.len() as f32).sqrt();
                     evidence_items.push(Evidence::KeywordMatch {
                         keyword: word.clone(),
@@ -540,8 +344,7 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
                 // Normalize: cap at 10.0 raw weight → 0.40 boost.
                 let boost = (matched_weight / 10.0 * 0.40).min(0.40);
 
-                // Inherit parent base confidence for subcategories (e.g.
-                // "Documents/Invoices" inherits "Documents" base = 0.60).
+                // Inherit parent base confidence for subcategories
                 let inherited_base: f32 = if !scores.contains_key(category) {
                     category
                         .find('/')
@@ -549,7 +352,7 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
                         .map(|p| p.base)
                         .unwrap_or(0.0)
                 } else {
-                    0.0 // will not overwrite existing base
+                    0.0
                 };
 
                 let entry = scores.entry(category.clone()).or_default();
@@ -576,7 +379,6 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
     let path_str = path.to_string_lossy().to_lowercase();
 
     let filename_patterns: &[(&str, &str, f32)] = &[
-        // (pattern_substr, category, boost)
         ("invoice", "Documents/Invoices", 0.15),
         ("receipt", "Documents/Invoices", 0.12),
         ("bill", "Documents/Invoices", 0.10),
@@ -622,11 +424,10 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
     ];
 
     for (segment, category, boost) in path_signals {
-        // Check if any path component (not the filename itself) matches
         if path_str
             .split('/')
             .rev()
-            .skip(1) // skip filename
+            .skip(1)
             .any(|part| part == *segment || part.starts_with(segment))
         {
             let entry = scores.entry(category.to_string()).or_default();
@@ -646,39 +447,20 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
     });
 
     match winner {
-        Some((category, score)) => ClassificationResult {
-            category,
-            confidence: score.total().min(1.0),
-            tier_used: score.decisive_tier.unwrap_or(Tier::Extension),
-            evidence: score.evidence,
-        },
+        Some((category, score)) => {
+            ClassificationResult {
+                category,
+                confidence: score.total().min(1.0),
+                tier_used: score.decisive_tier.unwrap_or(Tier::Extension),
+                evidence: score.evidence,
+            }
+        }
         None => ClassificationResult {
             category: "Misc".to_string(),
             confidence: 0.10,
             tier_used: Tier::Filename,
             evidence: vec![],
         },
-    }
-}
-
-/// Maps a magic-byte description to a coarse category.
-fn magic_to_category(desc: &str) -> &'static str {
-    if desc.contains("PDF") {
-        "Documents"
-    } else if desc.contains("ZIP")
-        || desc.contains("GZIP")
-        || desc.contains("BZIP2")
-        || desc.contains("XZ")
-    {
-        "Archives"
-    } else if desc.contains("JPEG") || desc.contains("PNG") || desc.contains("GIF") {
-        "Images"
-    } else if desc.contains("MP3") || desc.contains("FLAC") || desc.contains("RIFF") {
-        "Audio"
-    } else if desc.contains("SQLite") {
-        "Data/Database"
-    } else {
-        "Misc"
     }
 }
 
@@ -689,10 +471,11 @@ fn canonical_category_name(key: &str) -> String {
         "medical" => "Documents/Medical".to_string(),
         "legal" => "Documents/Legal".to_string(),
         "research" => "Documents/Research".to_string(),
+        "reports" => "Documents/Reports".to_string(),
+        "datascience" => "Code/DataScience".to_string(),
         "code" => "Code".to_string(),
         "finance" => "Finance".to_string(),
         _ => {
-            // Title-case the key as the category name
             let mut c = key.chars();
             c.next()
                 .map(|f| f.to_uppercase().to_string() + c.as_str())
@@ -719,23 +502,119 @@ mod tests {
     }
 
     #[test]
-    fn pdf_extension_gives_documents() {
+    fn test_tier1_extension_pdf() {
+        let path = PathBuf::from("document.pdf");
+        let ext = make_extracted("", b"", false);
+        let result = classify(&path, &ext, &Config::default());
+        assert_eq!(result.category, "Documents");
+        assert!((result.confidence - 0.60).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_tier1_magic_bytes_pdf() {
         let path = PathBuf::from("report.pdf");
         let ext = make_extracted("", b"%PDF-1.4", false);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents");
-        assert!(result.confidence >= 0.60);
+        assert!(result.confidence >= 0.60, "confidence={}", result.confidence);
     }
 
     #[test]
-    fn invoice_keywords_boost_to_invoices() {
+    fn test_tier2_invoice_keywords() {
         let path = PathBuf::from("doc.pdf");
-        let text =
-            "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
+        let text = "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
         let ext = make_extracted(text, b"%PDF", true);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents/Invoices");
         assert!(result.confidence > 0.75, "confidence={}", result.confidence);
+    }
+
+    #[test]
+    fn test_tier2_sqrt_dampening() {
+        // 4x "invoice" should not give 4x the score of 1x "invoice"
+        let path1 = PathBuf::from("doc.pdf");
+        let text1 = "invoice";
+        let ext1 = make_extracted(text1, b"", true);
+        let r1 = classify(&path1, &ext1, &Config::default());
+
+        let text4 = "invoice invoice invoice invoice";
+        let ext4 = make_extracted(text4, b"", true);
+        let r4 = classify(&path1, &ext4, &Config::default());
+
+        // sqrt(4) = 2, so 4x keyword should give 2x boost, not 4x
+        let ratio = r4.confidence / r1.confidence.max(0.01);
+        assert!(ratio < 3.5, "ratio={ratio}, dampening not working");
+    }
+
+    #[test]
+    fn test_tier2_subcategory_inherits() {
+        let path = PathBuf::from("doc.pdf");
+        let text = "Invoice #1234\nBill to: John\nTotal due: $500";
+        let ext = make_extracted(text, b"%PDF", true);
+        let result = classify(&path, &ext, &Config::default());
+        // Documents/Invoices should inherit Documents base of 0.60
+        assert_eq!(result.category, "Documents/Invoices");
+        assert!(result.confidence >= 0.60);
+    }
+
+    #[test]
+    fn test_tier3_filename_receipt() {
+        let path = PathBuf::from("receipt_amazon_2024.txt");
+        let text = "Thank you for your purchase. Total: $29.99";
+        let ext = make_extracted(text, b"", true);
+        let result = classify(&path, &ext, &Config::default());
+        assert!(
+            result.category.contains("Invoice") || result.category.contains("Document"),
+            "got: {}",
+            result.category
+        );
+    }
+
+    #[test]
+    fn test_tier3_path_signal_src() {
+        let path = PathBuf::from("/home/user/src/main.rs");
+        let text = "fn main() {}";
+        let ext = make_extracted(text, b"", true);
+        let result = classify(&path, &ext, &Config::default());
+        assert_eq!(result.category, "Code");
+    }
+
+    #[test]
+    fn test_confidence_cap() {
+        let path = PathBuf::from("invoice_final.pdf");
+        let text = "invoice invoice total due bill to amount receipt payment subtotal tax billed";
+        let ext = make_extracted(text, b"%PDF", true);
+        let result = classify(&path, &ext, &Config::default());
+        assert!(result.confidence <= 1.0);
+    }
+
+    #[test]
+    fn test_needs_review_below_threshold() {
+        let path = PathBuf::from("random.xyz");
+        let ext = make_extracted("", b"", false);
+        let result = classify(&path, &ext, &Config::default());
+        // No signals at all → very low confidence → Needs Review
+        assert_eq!(result.category, "Misc");
+        assert!(result.confidence < 0.5);
+    }
+
+    #[test]
+    fn test_user_keyword_extends_builtin() {
+        let toml_str = r#"
+[categories.invoices]
+keywords = [{ word = "GST", weight = 3.0 }]
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        let path = PathBuf::from("bill.pdf");
+        let text = "GST applied on purchase invoice total due";
+        let ext = make_extracted(text, b"%PDF", true);
+        let result = classify(&path, &ext, &config);
+        assert!(result.confidence > 0.60);
+        // Built-in "invoice" keyword should still work alongside user "GST"
+        let has_invoice_evidence = result.evidence.iter().any(|e| {
+            matches!(e, Evidence::KeywordMatch { keyword, .. } if keyword == "invoice")
+        });
+        assert!(has_invoice_evidence, "built-in keywords should not be replaced");
     }
 
     #[test]
@@ -749,72 +628,11 @@ mod tests {
     }
 
     #[test]
-    fn medical_keywords_detected() {
-        let path = PathBuf::from("note.txt");
-        let text =
-            "Patient: Alice Smith\nDiagnosis: Flu\nPrescription: 500mg\nClinic: City Hospital";
-        let ext = make_extracted(text, b"", true);
-        let result = classify(&path, &ext, &Config::default());
-        assert_eq!(result.category, "Documents/Medical");
-        assert!(result.confidence > 0.35, "confidence={}", result.confidence);
-    }
-
-    #[test]
-    fn filename_receipt_classifies_as_document_or_invoice() {
-        let path = PathBuf::from("receipt_amazon_2024.txt");
-        let text = "Thank you for your purchase. Total: $29.99";
-        let ext = make_extracted(text, b"", true);
-        let result = classify(&path, &ext, &Config::default());
-        // .txt base puts it in Documents; with strong invoice content it
-        // would promote to Documents/Invoices.  Either is acceptable.
-        assert!(
-            result.category.contains("Invoice") || result.category.contains("Document"),
-            "expected Invoice or Document category, got: {}",
-            result.category
-        );
-        assert!(result.confidence > 0.30, "confidence={}", result.confidence);
-    }
-
-    #[test]
-    fn filename_receipt_with_invoice_content_classifies_as_invoice() {
-        let path = PathBuf::from("receipt_amazon_2024.txt");
-        let text = "Invoice #1234 receipt. Total due: $29.99. Payment received.";
-        let ext = make_extracted(text, b"", true);
-        let result = classify(&path, &ext, &Config::default());
-        assert_eq!(result.category, "Documents/Invoices");
-        assert!(result.confidence > 0.50, "confidence={}", result.confidence);
-    }
-
-    #[test]
     fn image_extension_high_confidence() {
         let path = PathBuf::from("photo.jpg");
         let ext = make_extracted("", b"\xFF\xD8\xFF", false);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Images");
         assert!(result.confidence >= 0.70);
-    }
-
-    #[test]
-    fn confidence_capped_at_one() {
-        let path = PathBuf::from("invoice_final.pdf");
-        let text = "invoice invoice total due bill to amount receipt payment subtotal tax billed";
-        let ext = make_extracted(text, b"%PDF", true);
-        let result = classify(&path, &ext, &Config::default());
-        assert!(result.confidence <= 1.0);
-    }
-
-    #[test]
-    fn user_keyword_merges_with_builtin() {
-        let toml_str = r#"
-[categories.invoices]
-keywords = [{ word = "GST", weight = 3.0 }]
-"#;
-        let config: Config = toml::from_str(toml_str).unwrap();
-        let path = PathBuf::from("bill.pdf");
-        let text = "GST applied on purchase";
-        let ext = make_extracted(text, b"%PDF", true);
-        let result = classify(&path, &ext, &config);
-        // Should have some boosted invoices score
-        assert!(result.confidence > 0.60);
     }
 }

@@ -12,7 +12,6 @@ use crate::error::{FileMindError, Result};
 /// Generate a smart filename: `YYYY-MM-DD — <Category> — <original>`.
 pub fn smart_rename(filename: &str, category: &str) -> String {
     let date = Utc::now().format("%Y-%m-%d");
-    // Sanitize category: replace slashes with dashes for filesystem safety
     let safe_cat: String = category
         .chars()
         .map(|c| if c == '/' { '-' } else { c })
@@ -42,15 +41,11 @@ pub fn resolve_destination(
     }
 
     match strategy {
-        ConflictStrategy::Skip => {
-            // Return the path as-is; caller must check `== dest` and skip
-            Ok(candidate)
-        }
+        ConflictStrategy::Skip => Ok(candidate),
         ConflictStrategy::Overwrite => Ok(candidate),
-        ConflictStrategy::RenameNew => unique_path(dest_dir, filename, true),
+        ConflictStrategy::RenameNew => unique_path(dest_dir, filename),
         ConflictStrategy::RenameExisting => {
-            // Rename the existing file first
-            let existing_renamed = unique_path(dest_dir, filename, false)?;
+            let existing_renamed = unique_path(dest_dir, filename)?;
             std::fs::rename(&candidate, &existing_renamed).map_err(FileMindError::Io)?;
             Ok(candidate)
         }
@@ -58,7 +53,7 @@ pub fn resolve_destination(
 }
 
 /// Produce a unique path by appending ` (N)` before the extension.
-fn unique_path(dir: &Path, filename: &str, _new_file: bool) -> Result<PathBuf> {
+fn unique_path(dir: &Path, filename: &str) -> Result<PathBuf> {
     let stem = Path::new(filename)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -84,9 +79,6 @@ fn unique_path(dir: &Path, filename: &str, _new_file: bool) -> Result<PathBuf> {
 // ─── Copy / move ──────────────────────────────────────────────────────────────
 
 /// Copy `src` to `dest`, creating parent dirs as needed.
-///
-/// # Errors
-/// Returns [`FileMindError::Io`] on any I/O failure.
 pub fn copy_file(src: &Path, dest: &Path) -> Result<()> {
     if let Some(p) = dest.parent() {
         std::fs::create_dir_all(p).map_err(FileMindError::Io)?;
@@ -98,9 +90,6 @@ pub fn copy_file(src: &Path, dest: &Path) -> Result<()> {
 /// Move `src` to `dest`, creating parent dirs as needed.
 ///
 /// Falls back to copy + delete if the rename crosses filesystem boundaries.
-///
-/// # Errors
-/// Returns [`FileMindError::Io`] on any I/O failure.
 pub fn move_file(src: &Path, dest: &Path) -> Result<()> {
     if let Some(p) = dest.parent() {
         std::fs::create_dir_all(p).map_err(FileMindError::Io)?;
@@ -117,9 +106,6 @@ pub fn move_file(src: &Path, dest: &Path) -> Result<()> {
 }
 
 /// Zip the entire `output_dir` into `zip_path`.
-///
-/// # Errors
-/// Returns [`FileMindError::Io`] or [`FileMindError::Zip`] on failure.
 pub fn pack_to_zip(output_dir: &Path, zip_path: &Path) -> Result<()> {
     use std::io::Write;
     use walkdir::WalkDir;
@@ -137,7 +123,6 @@ pub fn pack_to_zip(output_dir: &Path, zip_path: &Path) -> Result<()> {
         .filter(|e| e.file_type().is_file())
     {
         let path = entry.path();
-        // Skip the manifest database itself
         if path.components().any(|c| c.as_os_str() == ".filemind") {
             continue;
         }
@@ -185,18 +170,30 @@ mod tests {
         let name = smart_rename("report.pdf", "Documents/Invoices");
         assert!(name.contains("Documents-Invoices"));
         assert!(name.contains("report.pdf"));
-        // Starts with a date
         assert!(name.chars().next().unwrap().is_ascii_digit());
     }
 
     #[test]
-    fn rename_new_produces_unique_name() {
+    fn test_conflict_rename_new() {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
         let dest =
             resolve_destination(dir.path(), "file.txt", &ConflictStrategy::RenameNew).unwrap();
         assert_ne!(dest, dir.path().join("file.txt"));
         assert!(dest.to_string_lossy().contains("(1)"));
+    }
+
+    #[test]
+    fn test_conflict_rename_99() {
+        let dir = TempDir::new().unwrap();
+        // Create file.txt and file (1).txt through file (98).txt
+        std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
+        for n in 1..=98 {
+            std::fs::write(dir.path().join(format!("file ({n}).txt")), b"existing").unwrap();
+        }
+        let dest =
+            resolve_destination(dir.path(), "file.txt", &ConflictStrategy::RenameNew).unwrap();
+        assert!(dest.to_string_lossy().contains("(99)"));
     }
 
     #[test]
@@ -216,5 +213,17 @@ mod tests {
         std::fs::write(&src, b"hello").unwrap();
         copy_file(&src, &dst).unwrap();
         assert_eq!(std::fs::read(&dst).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn test_cross_device_move_fallback() {
+        // Simulate: move within same tmpdir succeeds, verify file ends up at dest
+        let dir = TempDir::new().unwrap();
+        let src = dir.path().join("src.txt");
+        let dst = dir.path().join("sub/dst.txt");
+        std::fs::write(&src, b"hello").unwrap();
+        move_file(&src, &dst).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), b"hello");
+        assert!(!src.exists());
     }
 }

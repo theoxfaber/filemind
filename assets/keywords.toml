@@ -1,0 +1,113 @@
+# FileMind built-in keyword list — the canonical source of truth.
+#
+# This file is embedded at compile time. Users can export it with
+# `filemind keywords export` and place a copy at
+# `~/.config/filemind/keywords.toml` to extend or replace entries.
+#
+# Format:
+#   [category_key]
+#   keywords = [ { word = "...", weight = N.N, note = "..." }, ... ]
+#
+# - word:   case-insensitive substring matched against extracted text
+# - weight: higher = stronger signal (1.0 = weak, 3.0 = strong)
+# - note:   optional human-readable explanation (shown in `rules list`)
+
+[invoices]
+category = "Documents/Invoices"
+keywords = [
+  { word = "invoice",   weight = 3.0, note = "primary invoice signal" },
+  { word = "total due", weight = 2.5, note = "billing total line" },
+  { word = "bill to",   weight = 2.5, note = "billing address marker" },
+  { word = "amount",    weight = 1.5, note = "generic monetary signal" },
+  { word = "receipt",   weight = 2.0, note = "purchase receipt" },
+  { word = "payment",   weight = 1.5, note = "payment confirmation" },
+  { word = "subtotal",  weight = 2.0, note = "itemized total" },
+  { word = "tax",       weight = 1.0, note = "tax line item" },
+  { word = "billed",    weight = 1.5, note = "billing status" },
+  { word = "GST",       weight = 2.0, note = "India/Australia/Canada tax" },
+  { word = "VAT",       weight = 2.0, note = "UK/Europe tax" },
+  { word = "HST",       weight = 2.0, note = "Canada harmonized tax" },
+]
+
+[medical]
+category = "Documents/Medical"
+keywords = [
+  { word = "diagnosis",    weight = 3.0, note = "medical finding" },
+  { word = "prescription", weight = 3.0, note = "medication order" },
+  { word = "patient",      weight = 2.5, note = "patient reference" },
+  { word = "dosage",       weight = 2.0, note = "medication dosage" },
+  { word = "mg",           weight = 1.0, note = "milligram unit" },
+  { word = "clinic",       weight = 2.0, note = "healthcare facility" },
+  { word = "physician",    weight = 2.5, note = "doctor reference" },
+  { word = "symptom",      weight = 2.0, note = "medical symptom" },
+]
+
+[legal]
+category = "Documents/Legal"
+keywords = [
+  { word = "agreement",    weight = 3.0, note = "contract agreement" },
+  { word = "whereas",      weight = 3.0, note = "legal preamble clause" },
+  { word = "party",        weight = 1.5, note = "contracting party" },
+  { word = "liability",    weight = 2.5, note = "legal liability" },
+  { word = "jurisdiction", weight = 3.0, note = "legal jurisdiction" },
+  { word = "contract",     weight = 2.5, note = "contractual document" },
+  { word = "shall",        weight = 1.0, note = "legal obligation marker" },
+]
+
+[finance]
+category = "Finance"
+keywords = [
+  { word = "portfolio",     weight = 2.5, note = "investment portfolio" },
+  { word = "dividend",      weight = 3.0, note = "dividend payment" },
+  { word = "equity",        weight = 2.0, note = "equity/stock" },
+  { word = "balance sheet", weight = 3.0, note = "financial statement" },
+  { word = "quarterly",     weight = 1.5, note = "quarterly report" },
+  { word = "revenue",       weight = 2.0, note = "business revenue" },
+]
+
+[code]
+category = "Code"
+keywords = [
+  { word = "fn ",      weight = 2.0, note = "Rust function declaration" },
+  { word = "struct ",  weight = 2.0, note = "Rust/Go struct" },
+  { word = "impl ",    weight = 2.0, note = "Rust impl block" },
+  { word = "import ",  weight = 1.5, note = "Python/Java import" },
+  { word = "def ",     weight = 2.0, note = "Python function" },
+  { word = "#include", weight = 3.0, note = "C/C++ include directive" },
+  { word = "function", weight = 1.5, note = "JavaScript function" },
+  { word = "class ",   weight = 1.5, note = "OOP class declaration" },
+  { word = "return",   weight = 1.0, note = "return statement" },
+]
+
+[research]
+category = "Documents/Research"
+keywords = [
+  { word = "abstract",     weight = 2.5, note = "paper abstract section" },
+  { word = "bibliography", weight = 3.0, note = "reference list" },
+  { word = "hypothesis",   weight = 3.0, note = "research hypothesis" },
+  { word = "methodology",  weight = 2.5, note = "research methodology" },
+  { word = "references",   weight = 2.0, note = "citation references" },
+]
+
+[datascience]
+category = "Code/DataScience"
+keywords = [
+  { word = "pandas",      weight = 2.5, note = "Python data analysis library" },
+  { word = "numpy",       weight = 2.5, note = "Python numerical computing" },
+  { word = "matplotlib",  weight = 2.0, note = "Python plotting library" },
+  { word = "dataframe",   weight = 2.0, note = "tabular data structure" },
+  { word = "sklearn",     weight = 2.5, note = "scikit-learn ML library" },
+  { word = "tensorflow",  weight = 2.5, note = "Google ML framework" },
+  { word = "torch",       weight = 2.0, note = "PyTorch ML framework" },
+]
+
+[reports]
+category = "Documents/Reports"
+keywords = [
+  { word = "quarterly report", weight = 3.0, note = "quarterly business report" },
+  { word = "annual report",    weight = 3.0, note = "annual business report" },
+  { word = "executive summary", weight = 2.5, note = "report summary section" },
+  { word = "findings",          weight = 2.0, note = "report findings" },
+  { word = "recommendations",   weight = 2.0, note = "report recommendations" },
+  { word = "conclusion",        weight = 1.5, note = "report conclusion" },
+]

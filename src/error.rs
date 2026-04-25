@@ -55,6 +55,14 @@ pub enum FileMindError {
     /// Zip archive creation failed.
     #[error("Zip error: {0}")]
     Zip(#[from] zip::result::ZipError),
+
+    /// CSV serialization failed.
+    #[error("CSV error: {0}")]
+    Csv(String),
+
+    /// TOML serialization failed.
+    #[error("TOML serialize error: {0}")]
+    TomlSerialize(#[from] toml::ser::Error),
 }
 
 /// Convenience alias used throughout the crate.
