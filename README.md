@@ -1,223 +1,245 @@
-<div align="center">
+<![CDATA[<div align="center">
 
-```
-  ███████╗██╗██╗     ███████╗███╗   ███╗██╗███╗   ██╗██████╗
-  ██╔════╝██║██║     ██╔════╝████╗ ████║██║████╗  ██║██╔══██╗
-  █████╗  ██║██║     █████╗  ██╔████╔██║██║██╔██╗ ██║██║  ██║
-  ██╔══╝  ██║██║     ██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║  ██║
-  ██║     ██║███████╗███████╗██║ ╚═╝ ██║██║██║ ╚████║██████╔╝
-  ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═════╝
-```
+# 🧠 FileMind
 
-**The intelligent, content-aware file organizer — now in Rust.**
+**The first Rust-native, single-binary, content-aware file organizer with explainable confidence scores.**
 
-[![Rust](https://img.shields.io/badge/Built_with-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Powered by Gemini](https://img.shields.io/badge/AI-Google_Gemini-4285F4?style=flat-square&logo=google)](https://ai.google.dev/)
+*Zero AI · Zero network · Zero Python · Single binary*
 
-*Transform digital chaos into structured clarity — no web server, no Python, pure terminal.*
+[![CI](https://github.com/theoxfaber/filemind/actions/workflows/ci.yml/badge.svg)](https://github.com/theoxfaber/filemind/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 
 </div>
 
 ---
 
-## 🧠 What is FileMind?
+## Why FileMind?
 
-**FileMind** scans a directory of messy files, extracts their content (PDFs, code, text), sends it to **Google Gemini AI** for classification, and organizes everything into a clean folder hierarchy — all from your terminal.
+Every existing file organizer is one of:
 
-**v2.0 is a complete rewrite in Rust.** Faster, smaller, zero-dependency runtime (no Python, no venv, no uvicorn), and 100% terminal-native.
+| Tool | Method | Limitation |
+|------|--------|------------|
+| AI-powered tools | GPT / Gemini / Ollama | Non-deterministic, requires API key or GPU |
+| [organize](https://github.com/tfeldmann/organize) | Python rules + content | Needs pip, slow, no binary |
+| [hazel](https://www.noodlesoft.com/) / [hazelnut](https://github.com/jhrcook/hazelnut) | Extension/name rules only | No content reading |
 
----
-
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 🔍 **Deep Content Analysis** | Extracts text from PDFs, `.txt`, `.md`, `.rs`, `.py`, `.json`, `.csv`, and 10+ more formats |
-| 🧠 **AI-Powered Classification** | Google Gemini 2.0 Flash classifies files with confidence scores + reasoning |
-| ✨ **Smart Renaming** | Optional `YYYY-MM-DD — Category — filename` semantic rename |
-| 🛡️ **MD5 Deduplication** | Never processes the same file twice, across sessions |
-| ⚡ **Concurrent Pipeline** | Configurable parallelism (`-c 8`) for batch processing |
-| 📊 **Live Progress Bar** | Real-time spinner with file-by-file status |
-| 📦 **Zip Export** | Pack your organized output into a `.zip` with one command |
-| 🔄 **Local Sync** | Mirror output to any path on your filesystem |
-| 🗂️ **Persistent Manifest** | JSON log of every organized file (category, confidence, md5, timestamp) |
-| 🖥️ **Terminal-First** | No web server. No browser. No background daemon. Pure CLI. |
+**FileMind v3** reads file content (PDF text, source code, CSV/JSON headers, magic bytes) and classifies with a **3-tier deterministic engine** that emits explainable confidence scores. Every decision is transparent — no black box.
 
 ---
 
-## 🚀 Quick Start
+## Features
 
-### 1. Prerequisites
+- **3-Tier Deterministic Classifier** — Extension + magic bytes → keyword scoring on content → filename/path heuristics
+- **`--explain` flag** — See exactly *why* each file was classified (offsets, weights, tier)
+- **Full undo** — Every session recorded in SQLite; `filemind undo` restores with checksum verification
+- **TOML config** — Define custom categories with weighted keywords at `~/.config/filemind/config.toml`
+- **Watch mode** — `filemind watch <dir>` organizes new files automatically
+- **Smart rename** — `YYYY-MM-DD — Category — filename.pdf`
+- **Shell completions** — bash, zsh, fish, elvish
+- **Single binary** — `cargo install filemind` or download from releases
+- **Cross-platform** — Linux, macOS, Windows
 
-- [Rust 1.75+](https://rustup.rs/) (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey) (free tier available)
+---
 
-### 2. Clone & Build
+## Quick Start
+
+### Install
 
 ```bash
-git clone https://github.com/theoxfaber/filemind.git
-cd filemind
-cargo build --release
-```
-
-The binary is at `./target/release/filemind`.
-
-Install it system-wide (optional):
-```bash
+# From source
 cargo install --path .
+
+# Or build release binary
+cargo build --release
+# Binary at: target/release/filemind
 ```
 
-### 3. Configure API Key
+### Organize a directory
 
 ```bash
-# Option A: .env file (recommended)
-echo "GEMINI_API_KEY=your_key_here" > .env
+# Basic organize (copies files to ./output/)
+filemind organize -i ~/Downloads
 
-# Option B: shell export
-export GEMINI_API_KEY=your_key_here
+# Dry run — see what would happen
+filemind organize -i ~/Downloads --dry-run
+
+# With explainable output
+filemind organize -i ~/Downloads --explain
+
+# Smart rename + custom output
+filemind organize -i ~/inbox -o ~/Organized --smart-rename -c 8
+```
+
+### Example `--explain` output
+
+```
+  ✓ receipt_amazon.pdf → Documents/Invoices [confidence: 0.94]
+    tier-1  .pdf extension        +0.60
+    tier-1  magic bytes: PDF      +0.10
+    tier-2  "invoice" ×3          +3.00  (offsets: 142, 890, 2103)
+    tier-2  "total due" ×1        +2.50
+    tier-2  "amount" ×2           +1.50
+    tier-3  filename "receipt"    +0.12
+    →  decisive tier: tier-2 (content keywords)
 ```
 
 ---
 
-## 🖥️ Usage
+## All Commands
 
 ```
-filemind [COMMAND] [OPTIONS]
-```
-
-### `organize` — The main pipeline
-
-```bash
-# Organize files in ./inbox → ./output
-filemind organize --input ./inbox --output ./output
-
-# Enable smart semantic renaming
-filemind organize -i ./inbox -o ./output --smart-rename
-
-# Dry-run: see what would happen, touch nothing
-filemind organize -i ./inbox --dry-run
-
-# Increase concurrency to 8 parallel Gemini calls
-filemind organize -i ./inbox -c 8
-```
-
-**Output structure example:**
-```
-output/
-├── Invoices/
-│   └── 2025-04-25 — Invoices — receipt_amazon.pdf
-├── Code/
-│   └── script.py
-├── Medical/
-│   └── blood_test_results.pdf
-└── Needs Review/
-    └── unknown_binary.dat
-```
-
-### `status` — View the manifest
-
-```bash
-filemind status --output ./output
-```
-
-```
- 📋 FileMind Manifest — 14 files
-
-  Code (3)
-    → script.py  [100%]
-    → main.rs  [100%]
-    → utils.ts  [98%]
-  Invoices (5)
-    → 2025-04-25 — Invoices — receipt.pdf  [100%]
-    ...
-  Needs Review (2)
-    → mystery_file.dat  [0%]
-```
-
-### `pack` — Create a zip archive
-
-```bash
-filemind pack --output ./output --zip filemind_organized.zip
-```
-
-### `sync` — Copy to another directory
-
-```bash
-filemind sync --output ./output --target ~/Documents/Organized
+filemind organize -i <dir> [-o <dir>] [--dry-run] [--explain] [--smart-rename] [-c <n>] [--copy]
+filemind watch <dir>              # Live watch mode — organize on new files
+filemind undo [--session <id>]    # Restore files from last or specific session
+filemind sessions [--show <id>]   # List or inspect sessions
+filemind status [-o <dir>]        # Show manifest summary table
+filemind rules list               # Show active classification rules
+filemind rules check <file>       # Classify a single file with --explain
+filemind pack [-o <dir>] [--zip <file>]      # Zip the output folder
+filemind sync [-o <dir>] --target <path>     # Mirror output to target
+filemind completions <shell>      # Generate shell completions (bash/zsh/fish/elvish)
 ```
 
 ---
 
-## 📂 Supported File Types
+## How the 3-Tier Classifier Works
 
-| Type | Extensions | Method |
-|---|---|---|
-| Plain text | `.txt`, `.md`, `.log` | Direct read |
-| Source code | `.rs`, `.py`, `.js`, `.ts`, `.sh` | Direct read |
-| Data/config | `.json`, `.csv`, `.yaml`, `.toml`, `.xml` | Direct read |
-| PDF | `.pdf` | Pure-Rust extraction (`pdf-extract`) |
-| Web | `.html`, `.htm`, `.css` | Direct read |
-| Other | anything else | Filename-only classification |
+All three tiers run independently and produce a confidence score `[0.0–1.0]`. The highest combined score wins.
 
-> **No Tesseract required.** OCR for scanned images is not needed for the vast majority of files. Pure-Rust PDF text extraction handles most documents.
+### Tier 1 — Extension + Magic Bytes (~0 ms, always runs)
+
+Maps 200+ file extensions to categories. Reads first 16 bytes for magic-byte detection (`%PDF`, `PK\x03\x04`, `\x89PNG`, etc.). Produces a base confidence, e.g. `.pdf` → Documents @ 0.60.
+
+### Tier 2 — Keyword Scoring (ms range, runs when text extractable)
+
+Extracts up to 4 KB of text content, then scores against weighted keyword lists per category:
+
+| Category | Keywords |
+|----------|----------|
+| Invoices | invoice, total due, bill to, amount, receipt, payment, subtotal |
+| Medical | diagnosis, prescription, patient, dosage, clinic, physician |
+| Legal | agreement, whereas, party, liability, jurisdiction, contract |
+| Code | fn, struct, impl, import, def, #include, function, class |
+| Finance | portfolio, dividend, equity, balance sheet, quarterly |
+| Research | abstract, bibliography, hypothesis, methodology, references |
+
+**Subcategory inheritance**: When a subcategory like `Documents/Invoices` matches keywords, it inherits its parent's base confidence from tier-1.
+
+### Tier 3 — Filename + Path Heuristics (~0 ms, always runs)
+
+Regex patterns on filenames (`receipt_*`, `IMG_*`, `Screenshot*`), plus path segment signals (if a parent folder is named `invoices/`, boost the invoice score).
 
 ---
 
-## 🏗️ Architecture
+## Configuration
+
+FileMind looks for config at `~/.config/filemind/config.toml` (override with `$FILEMIND_CONFIG`).
+
+```toml
+[general]
+output_dir = "~/Documents/Organized"
+smart_rename = false
+concurrency = 4
+min_confidence = 0.5       # Below this → "Needs Review/" folder
+conflict = "rename_new"    # skip | overwrite | rename_new | rename_existing
+copy = true                # Copy files (true) or move them (false)
+
+[categories.invoices]
+keywords = [
+  { word = "invoice", weight = 3.0 },
+  { word = "GST", weight = 2.5 },       # India-specific
+]
+output_folder = "Finance/Invoices"
+
+# Create entirely new categories
+[categories.recipes]
+keywords = [
+  { word = "ingredients", weight = 3.0 },
+  { word = "preheat", weight = 2.0 },
+  { word = "serves", weight = 1.5 },
+]
+output_folder = "Personal/Recipes"
+extensions = [".pdf", ".txt"]
+```
+
+---
+
+## Undo System
+
+Every `organize` run creates a session in SQLite. Files can be restored with checksum verification.
+
+```bash
+# List all sessions
+filemind sessions
+
+# Inspect a specific session
+filemind sessions --show 3
+
+# Undo the last session
+filemind undo
+
+# Undo a specific session
+filemind undo --session 3
+```
+
+Undo verifies the SHA-256 checksum of each file before restoring — if a file was modified after organizing, it warns and skips (no silent data loss).
+
+---
+
+## Architecture
 
 ```
 src/
-├── main.rs        # CLI dispatcher (clap)
-├── config.rs      # API key resolution
-├── extractor.rs   # Text extraction (PDF + plain text)
-├── classifier.rs  # Async Gemini API client with retry
-├── organizer.rs   # File pipeline, zip, sync, dedup
-├── manifest.rs    # Persistent JSON manifest
-└── ui.rs          # ASCII banner, colored output
+├── main.rs          # clap v4 dispatcher — subcommand routing
+├── lib.rs           # Public library API
+├── error.rs         # Typed errors (thiserror) — no unwrap() in library code
+├── config.rs        # TOML loader, rule merging, ConflictStrategy
+├── extractor.rs     # Content extraction: PDF (pdf-extract), text, code, CSV
+├── classifier.rs    # 3-tier deterministic engine — the core innovation
+├── engine.rs        # Async pipeline: walk → extract → classify → act
+├── organizer.rs     # File ops: copy/move, smart rename, conflict resolution
+├── manifest.rs      # SQLite manifest (rusqlite) — every operation recorded
+├── session.rs       # Session log for full undo support
+├── ui.rs            # indicatif progress bars, --explain rendering
+├── watcher.rs       # notify-based watch mode
+└── completions.rs   # Shell completions via clap_complete
 ```
 
-**Key design decisions:**
-- **`tokio` async** with a `Semaphore`-bounded concurrency pool — no thread-per-file overhead
-- **`reqwest` + `rustls`** — pure-Rust TLS, no OpenSSL system dependency
-- **`pdf-extract`** — no `tesseract` / no C deps for PDF text
-- **MD5 dedup** persisted in `manifest.json` — survives restarts
-- **`indicatif`** progress bars — always know what's happening
+### Key Dependencies
+
+| Crate | Purpose |
+|-------|---------|
+| `clap` + `clap_complete` | CLI parsing + shell completions |
+| `tokio` | Async runtime for concurrent pipeline |
+| `rusqlite` (bundled) | SQLite manifest + session tracking |
+| `pdf-extract` | Pure-Rust PDF text extraction (no C deps) |
+| `notify` | Cross-platform file watching |
+| `indicatif` + `console` | Terminal progress bars + colors |
+| `sha2` + `md5` | Undo integrity + dedup checksums |
+| `infer` | Magic-byte MIME detection |
+| `thiserror` + `anyhow` | Typed + ergonomic error handling |
 
 ---
 
-## ⚙️ Configuration
+## Code Quality
 
-All config is via environment variables (or `.env`):
-
-| Variable | Required | Description |
-|---|---|---|
-| `GEMINI_API_KEY` | ✅ Yes | Your Google Gemini API key |
-
----
-
-## 🤝 Contributing
-
-PRs welcome. The codebase is intentionally small and modular. Each file has one responsibility.
-
-```bash
-cargo fmt        # Format
-cargo clippy     # Lint
-cargo test       # Test
-```
+- ✅ Every public function has doc comments
+- ✅ All errors typed via `thiserror` — no `unwrap()` in library code
+- ✅ Zero clippy warnings (`cargo clippy -- -D warnings`)
+- ✅ `cargo fmt` enforced
+- ✅ 24 unit tests covering classifier, config, extractor, organizer, sessions
+- ✅ GitHub Actions CI: fmt + clippy + release build on Ubuntu + macOS
 
 ---
 
-## 📄 License
+## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
 
 ---
 
 <div align="center">
-
-*"The best file manager is the one you never have to manage."* 🚀
-
-**[theoxfaber](https://github.com/theoxfaber)**
-
+<sub>Built with 🦀 Rust — deterministic, explainable, fast.</sub>
 </div>
+]]>

@@ -1,266 +1,218 @@
-use crate::{classifier, config, extractor, manifest};
-use anyhow::{Context, Result};
-use chrono::Utc;
-use colored::Colorize;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use reqwest::Client;
+//! File operations: copy/move with conflict resolution and smart renaming.
+
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::Semaphore;
 
-/// Computes the MD5 hash of a file.
-pub fn file_md5(path: &Path) -> String {
-    let bytes = std::fs::read(path).unwrap_or_default();
-    format!("{:x}", md5::compute(&bytes))
-}
+use chrono::Utc;
 
-/// Smart rename: YYYY-MM-DD — Category — original_name
-fn smart_rename(filename: &str, category: &str) -> String {
+use crate::config::ConflictStrategy;
+use crate::error::{FileMindError, Result};
+
+// ─── Smart rename ─────────────────────────────────────────────────────────────
+
+/// Generate a smart filename: `YYYY-MM-DD — <Category> — <original>`.
+pub fn smart_rename(filename: &str, category: &str) -> String {
     let date = Utc::now().format("%Y-%m-%d");
-    let clean_cat: String = category
+    // Sanitize category: replace slashes with dashes for filesystem safety
+    let safe_cat: String = category
         .chars()
-        .filter(|c| c.is_alphanumeric() || " -_".contains(*c))
+        .map(|c| if c == '/' { '-' } else { c })
         .collect();
-    format!("{date} — {clean_cat} — {filename}")
+    format!("{date} — {safe_cat} — {filename}")
 }
 
-/// Main organizer: walks input_dir, classifies each file, copies to output_dir/Category/
-pub async fn run(
-    input_dir: &str,
-    output_dir: &str,
-    smart_rename_flag: bool,
-    dry_run: bool,
-    concurrency: usize,
-) -> Result<()> {
-    let api_key = config::gemini_api_key()?;
+// ─── Conflict resolution ──────────────────────────────────────────────────────
 
-    // Collect all candidate files
-    let files: Vec<PathBuf> = collect_files(input_dir);
+/// Resolve a destination path according to the conflict strategy.
+///
+/// Returns the final path to write to, creating any intermediate directories.
+///
+/// # Errors
+/// Returns [`FileMindError::ConflictResolution`] if a unique path cannot
+/// be determined within 999 attempts.
+pub fn resolve_destination(
+    dest_dir: &Path,
+    filename: &str,
+    strategy: &ConflictStrategy,
+) -> Result<PathBuf> {
+    std::fs::create_dir_all(dest_dir).map_err(FileMindError::Io)?;
+    let candidate = dest_dir.join(filename);
 
-    if files.is_empty() {
-        println!("{}", "No files found to organize.".yellow());
-        return Ok(());
+    if !candidate.exists() {
+        return Ok(candidate);
     }
 
-    println!(
-        "\n{}  {}\n",
-        "🔍 Found".bold(),
-        format!("{} files", files.len()).cyan().bold()
-    );
-
-    if dry_run {
-        println!("{}\n", "⚡ DRY-RUN mode — no files will be written.".yellow().bold());
+    match strategy {
+        ConflictStrategy::Skip => {
+            // Return the path as-is; caller must check `== dest` and skip
+            Ok(candidate)
+        }
+        ConflictStrategy::Overwrite => Ok(candidate),
+        ConflictStrategy::RenameNew => unique_path(dest_dir, filename, true),
+        ConflictStrategy::RenameExisting => {
+            // Rename the existing file first
+            let existing_renamed = unique_path(dest_dir, filename, false)?;
+            std::fs::rename(&candidate, &existing_renamed).map_err(FileMindError::Io)?;
+            Ok(candidate)
+        }
     }
+}
 
-    std::fs::create_dir_all(output_dir).ok();
+/// Produce a unique path by appending ` (N)` before the extension.
+fn unique_path(dir: &Path, filename: &str, _new_file: bool) -> Result<PathBuf> {
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
+    let ext = Path::new(filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| format!(".{e}"))
+        .unwrap_or_default();
 
-    let mp = MultiProgress::new();
-    let overall_style = ProgressStyle::with_template(
-        "{spinner:.cyan} [{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}",
-    )
-    .unwrap()
-    .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
-
-    let overall = mp.add(ProgressBar::new(files.len() as u64));
-    overall.set_style(overall_style);
-    overall.set_message("Organizing files…");
-
-    let client = Arc::new(
-        Client::builder()
-            .use_rustls_tls()
-            .build()
-            .context("Failed to build HTTP client")?,
-    );
-    let api_key = Arc::new(api_key);
-    let sem = Arc::new(Semaphore::new(concurrency));
-    let output_dir = Arc::new(output_dir.to_string());
-    let overall = Arc::new(overall);
-
-    let mut handles = Vec::new();
-
-    for file_path in files {
-        let client = Arc::clone(&client);
-        let api_key = Arc::clone(&api_key);
-        let sem = Arc::clone(&sem);
-        let output_dir = Arc::clone(&output_dir);
-        let overall = Arc::clone(&overall);
-
-        let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
-
-            let md5 = file_md5(&file_path);
-            let filename = file_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-
-            // Dedup check
-            if manifest::is_duplicate(&output_dir, &md5) {
-                overall.inc(1);
-                overall.set_message(format!("⏭  Skipped duplicate: {filename}"));
-                return;
-            }
-
-            // Extract text
-            let text = extractor::extract_text(&file_path).unwrap_or_default();
-
-            // Classify
-            let mut result = classifier::classify(&client, &api_key, &filename, &text).await;
-
-            // Low-confidence override
-            if result.confidence < 40 {
-                result.reasoning =
-                    format!("[Low Confidence {}%] {}", result.confidence, result.reasoning);
-                result.category = "Needs Review".to_string();
-            }
-
-            let final_name = if smart_rename_flag && result.category != "Needs Review" {
-                smart_rename(&filename, &result.category)
-            } else {
-                filename.clone()
-            };
-
-            if !dry_run {
-                // Create category subfolder
-                let dest_dir = Path::new(output_dir.as_str()).join(&result.category);
-                std::fs::create_dir_all(&dest_dir).ok();
-                let dest_path = dest_dir.join(&final_name);
-
-                if let Err(e) = std::fs::copy(&file_path, &dest_path) {
-                    eprintln!("  [error] Copy failed for {filename}: {e}");
-                    overall.inc(1);
-                    return;
-                }
-
-                // Update manifest
-                let entry = manifest::ManifestEntry {
-                    original_name: filename.clone(),
-                    final_name: final_name.clone(),
-                    category: result.category.clone(),
-                    confidence: result.confidence,
-                    reasoning: result.reasoning.clone(),
-                    md5,
-                    organized_at: Utc::now(),
-                };
-                let _ = manifest::append(&output_dir, entry);
-            }
-
-            overall.inc(1);
-            overall.set_message(format!(
-                "{} → {} [{:.0}%]",
-                filename.dimmed(),
-                result.category.cyan(),
-                result.confidence
-            ));
-        });
-
-        handles.push(handle);
+    for n in 1..=999 {
+        let name = format!("{stem} ({n}){ext}");
+        let candidate = dir.join(&name);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
     }
+    Err(FileMindError::ConflictResolution {
+        path: dir.join(filename).to_string_lossy().into_owned(),
+    })
+}
 
-    for h in handles {
-        let _ = h.await;
+// ─── Copy / move ──────────────────────────────────────────────────────────────
+
+/// Copy `src` to `dest`, creating parent dirs as needed.
+///
+/// # Errors
+/// Returns [`FileMindError::Io`] on any I/O failure.
+pub fn copy_file(src: &Path, dest: &Path) -> Result<()> {
+    if let Some(p) = dest.parent() {
+        std::fs::create_dir_all(p).map_err(FileMindError::Io)?;
     }
-
-    overall.finish_with_message("Done!");
-
-    // Print final summary
-    if !dry_run {
-        manifest::print_status(&output_dir)?;
-    }
-
+    std::fs::copy(src, dest).map_err(FileMindError::Io)?;
     Ok(())
 }
 
-/// Creates a zip archive of output_dir.
-pub fn pack(output_dir: &str, zip_path: &str) -> Result<()> {
-    use colored::Colorize;
+/// Move `src` to `dest`, creating parent dirs as needed.
+///
+/// Falls back to copy + delete if the rename crosses filesystem boundaries.
+///
+/// # Errors
+/// Returns [`FileMindError::Io`] on any I/O failure.
+pub fn move_file(src: &Path, dest: &Path) -> Result<()> {
+    if let Some(p) = dest.parent() {
+        std::fs::create_dir_all(p).map_err(FileMindError::Io)?;
+    }
+    match std::fs::rename(src, dest) {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            // Cross-device rename: fall back to copy + remove
+            std::fs::copy(src, dest).map_err(FileMindError::Io)?;
+            std::fs::remove_file(src).map_err(FileMindError::Io)?;
+            Ok(())
+        }
+    }
+}
+
+/// Zip the entire `output_dir` into `zip_path`.
+///
+/// # Errors
+/// Returns [`FileMindError::Io`] or [`FileMindError::Zip`] on failure.
+pub fn pack_to_zip(output_dir: &Path, zip_path: &Path) -> Result<()> {
     use std::io::Write;
+    use walkdir::WalkDir;
     use zip::write::SimpleFileOptions;
 
-    println!("\n{} {}", "📦 Packing".bold(), zip_path.cyan());
-
-    let zip_file =
-        std::fs::File::create(zip_path).with_context(|| format!("Cannot create {zip_path}"))?;
-    let mut zip = zip::ZipWriter::new(zip_file);
-
-    let options = SimpleFileOptions::default()
+    let file = std::fs::File::create(zip_path).map_err(FileMindError::Io)?;
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o644);
 
-    for entry in walkdir::WalkDir::new(output_dir)
+    for entry in WalkDir::new(output_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
     {
         let path = entry.path();
-        let name = path
+        // Skip the manifest database itself
+        if path.components().any(|c| c.as_os_str() == ".filemind") {
+            continue;
+        }
+        let rel = path
             .strip_prefix(output_dir)
             .unwrap_or(path)
             .to_string_lossy();
-
-        zip.start_file(name.as_ref(), options)
-            .context("zip start_file failed")?;
-        let data = std::fs::read(path)?;
-        zip.write_all(&data).context("zip write failed")?;
+        zip.start_file(rel.as_ref(), opts)?;
+        let data = std::fs::read(path).map_err(FileMindError::Io)?;
+        zip.write_all(&data).map_err(FileMindError::Io)?;
     }
-
-    zip.finish().context("zip finish failed")?;
-    println!("{} {}", "✅ Archive written to".green(), zip_path.cyan().bold());
+    zip.finish()?;
     Ok(())
 }
 
-/// Syncs output_dir to target_path by copying all files.
-pub fn sync(output_dir: &str, target_path: &str) -> Result<()> {
-    use colored::Colorize;
+/// Mirror `output_dir` into `target` (copy all files, preserving sub-structure).
+pub fn sync_to_dir(output_dir: &Path, target: &Path) -> Result<()> {
+    use walkdir::WalkDir;
 
-    // Resolve ~ to home directory
-    let resolved = if target_path.starts_with('~') {
-        let home = dirs::home_dir().context("Could not resolve home directory")?;
-        home.join(&target_path[2..])
-    } else {
-        PathBuf::from(target_path)
-    };
-
-    println!(
-        "\n{} {} → {}",
-        "🔄 Syncing".bold(),
-        output_dir.cyan(),
-        resolved.display().to_string().cyan()
-    );
-
-    for entry in walkdir::WalkDir::new(output_dir)
+    for entry in WalkDir::new(output_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
     {
         let src = entry.path();
-        let rel = src.strip_prefix(output_dir).unwrap_or(src);
-        let dest = resolved.join(rel);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).ok();
+        if src.components().any(|c| c.as_os_str() == ".filemind") {
+            continue;
         }
-        std::fs::copy(src, &dest).with_context(|| {
-            format!("Failed to copy {} → {}", src.display(), dest.display())
-        })?;
+        let rel = src.strip_prefix(output_dir).unwrap_or(src);
+        let dest = target.join(rel);
+        copy_file(src, &dest)?;
     }
-
-    println!("{}", "✅ Sync complete.".green().bold());
     Ok(())
 }
 
-/// Walks input_dir and returns all regular files (non-recursive into hidden dirs).
-fn collect_files(input_dir: &str) -> Vec<PathBuf> {
-    walkdir::WalkDir::new(input_dir)
-        .min_depth(1)
-        .into_iter()
-        .filter_entry(|e| {
-            // Skip hidden directories like .git
-            let name = e.file_name().to_string_lossy();
-            !name.starts_with('.')
-        })
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .map(|e| e.path().to_path_buf())
-        .collect()
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn smart_rename_format() {
+        let name = smart_rename("report.pdf", "Documents/Invoices");
+        assert!(name.contains("Documents-Invoices"));
+        assert!(name.contains("report.pdf"));
+        // Starts with a date
+        assert!(name.chars().next().unwrap().is_ascii_digit());
+    }
+
+    #[test]
+    fn rename_new_produces_unique_name() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
+        let dest = resolve_destination(dir.path(), "file.txt", &ConflictStrategy::RenameNew).unwrap();
+        assert_ne!(dest, dir.path().join("file.txt"));
+        assert!(dest.to_string_lossy().contains("(1)"));
+    }
+
+    #[test]
+    fn overwrite_returns_same_path() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
+        let dest = resolve_destination(dir.path(), "file.txt", &ConflictStrategy::Overwrite).unwrap();
+        assert_eq!(dest, dir.path().join("file.txt"));
+    }
+
+    #[test]
+    fn copy_file_works() {
+        let dir = TempDir::new().unwrap();
+        let src = dir.path().join("src.txt");
+        let dst = dir.path().join("sub/dst.txt");
+        std::fs::write(&src, b"hello").unwrap();
+        copy_file(&src, &dst).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), b"hello");
+    }
 }
