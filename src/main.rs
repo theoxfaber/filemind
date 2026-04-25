@@ -12,8 +12,7 @@ use clap_complete::Shell;
 use colored::Colorize;
 
 use filemind::{
-    audit,
-    classifier,
+    audit, classifier,
     config::{Config, OutputFormat},
     engine::{run as engine_run, PipelineOptions},
     manifest::Manifest,
@@ -267,7 +266,9 @@ async fn main() -> anyhow::Result<()> {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.effective_output_dir());
 
-            let fmt: OutputFormat = output_format.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+            let fmt: OutputFormat = output_format
+                .parse()
+                .map_err(|e: String| anyhow::anyhow!(e))?;
 
             let mut opts = PipelineOptions::from_config(&config, input_path, output_path);
             opts.dry_run = dry_run;
@@ -362,12 +363,17 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::Status { output, output_format } => {
+        Commands::Status {
+            output,
+            output_format,
+        } => {
             let output_path = output
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.effective_output_dir());
             let manifest = Manifest::open(&output_path)?;
-            let fmt: OutputFormat = output_format.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+            let fmt: OutputFormat = output_format
+                .parse()
+                .map_err(|e: String| anyhow::anyhow!(e))?;
 
             match fmt {
                 OutputFormat::Human => ui::print_status(&manifest),
@@ -413,7 +419,9 @@ async fn main() -> anyhow::Result<()> {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.effective_output_dir());
             let manifest = Manifest::open(&output_path)?;
-            let fmt: OutputFormat = output_format.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+            let fmt: OutputFormat = output_format
+                .parse()
+                .map_err(|e: String| anyhow::anyhow!(e))?;
 
             if apply {
                 let moved = audit::apply_audit(&manifest, &config, &output_path, min_drift)?;
@@ -490,7 +498,9 @@ async fn main() -> anyhow::Result<()> {
                     result.confidence
                 );
                 // Exit 1 if Needs Review (low confidence)
-                if result.category == "Needs Review" || result.confidence < config.general.min_confidence {
+                if result.category == "Needs Review"
+                    || result.confidence < config.general.min_confidence
+                {
                     std::process::exit(1);
                 }
             }

@@ -227,18 +227,27 @@ pub fn print_stats(manifest: &Manifest, days: i64) {
         return;
     }
 
+    println!("\n{}", " 📊 FileMind Stats ".black().on_cyan().bold());
     println!(
-        "\n{}",
-        " 📊 FileMind Stats ".black().on_cyan().bold()
+        "  {}",
+        "══════════════════════════════════════════════════════".dimmed()
     );
-    println!("  {}", "══════════════════════════════════════════════════════".dimmed());
 
     // Overview box
     println!("\n  {}", "Overview".bold());
     println!("  ┌─────────────────┬────────┐");
-    println!("  │ Total files     │ {:>6} │", stats.total_files.to_string().yellow());
-    println!("  │ Total size      │ {:>6} │", format_size(stats.total_size).yellow());
-    println!("  │ Sessions        │ {:>6} │", stats.session_count.to_string().yellow());
+    println!(
+        "  │ Total files     │ {:>6} │",
+        stats.total_files.to_string().yellow()
+    );
+    println!(
+        "  │ Total size      │ {:>6} │",
+        format_size(stats.total_size).yellow()
+    );
+    println!(
+        "  │ Sessions        │ {:>6} │",
+        stats.session_count.to_string().yellow()
+    );
     println!("  │ Avg confidence  │ {:>5.3} │", stats.avg_confidence);
     println!("  └─────────────────┴────────┘");
 
@@ -281,20 +290,17 @@ pub fn print_stats(manifest: &Manifest, days: i64) {
             } else {
                 0.0
             };
-            println!(
-                "  {}  {} {} ({:.0}%)",
-                bucket,
-                bar.cyan(),
-                count,
-                pct
-            );
+            println!("  {}  {} {} ({:.0}%)", bucket, bar.cyan(), count, pct);
         }
     }
 
     // Recent activity
     if let Ok(activity) = manifest.recent_activity(days) {
         if !activity.is_empty() {
-            println!("\n  {}", format!("Recent Activity (last {days} days)").bold());
+            println!(
+                "\n  {}",
+                format!("Recent Activity (last {days} days)").bold()
+            );
             for (date, total, cats) in &activity {
                 let cat_summary: Vec<String> = cats
                     .iter()
@@ -319,10 +325,11 @@ pub fn print_stats(manifest: &Manifest, days: i64) {
 pub fn print_rules() {
     let mut by_cat: BTreeMap<String, Vec<(String, f32, Option<String>)>> = BTreeMap::new();
     for kw in BUILTIN_KEYWORDS.iter() {
-        by_cat
-            .entry(kw.category.clone())
-            .or_default()
-            .push((kw.word.clone(), kw.weight, kw.note.clone()));
+        by_cat.entry(kw.category.clone()).or_default().push((
+            kw.word.clone(),
+            kw.weight,
+            kw.note.clone(),
+        ));
     }
 
     println!("\n{}", " 📜 Active Rules ".black().on_cyan().bold());

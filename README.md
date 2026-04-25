@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/rust-1.75+-orange?style=flat-square&logo=rust" alt="MSRV" />
+  <img src="https://img.shields.io/badge/rust-1.85+-orange?style=flat-square&logo=rust" alt="MSRV" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/binary-6.3MB-brightgreen?style=flat-square" alt="Binary Size" />
   <img src="https://img.shields.io/badge/CI-passing-success?style=flat-square" alt="CI" />

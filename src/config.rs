@@ -128,7 +128,9 @@ impl std::str::FromStr for OutputFormat {
             "human" => Ok(OutputFormat::Human),
             "json" => Ok(OutputFormat::Json),
             "csv" => Ok(OutputFormat::Csv),
-            other => Err(format!("unknown output format: '{other}' (expected: human, json, csv)")),
+            other => Err(format!(
+                "unknown output format: '{other}' (expected: human, json, csv)"
+            )),
         }
     }
 }
@@ -396,12 +398,11 @@ keywords = [
             ("\"rename_existing\"", ConflictStrategy::RenameExisting),
         ];
         for (input, expected) in cases {
-            let parsed: ConflictStrategy =
-                toml::from_str(&format!("conflict = {input}\n"))
-                    .map(|c: std::collections::HashMap<String, ConflictStrategy>| {
-                        c.into_values().next().unwrap()
-                    })
-                    .expect("parse failed");
+            let parsed: ConflictStrategy = toml::from_str(&format!("conflict = {input}\n"))
+                .map(|c: std::collections::HashMap<String, ConflictStrategy>| {
+                    c.into_values().next().unwrap()
+                })
+                .expect("parse failed");
             assert_eq!(parsed, expected, "failed for input: {input}");
         }
     }

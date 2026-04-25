@@ -405,9 +405,7 @@ fn collect_files(dir: &Path, no_ignore: bool) -> Result<(Vec<PathBuf>, usize)> {
     }
 
     // Count of files that would have been found without ignore
-    let all_count = collect_files_simple(dir)
-        .map(|(f, _)| f.len())
-        .unwrap_or(0);
+    let all_count = collect_files_simple(dir).map(|(f, _)| f.len()).unwrap_or(0);
     let ignored = all_count.saturating_sub(files.len());
 
     // Subtract the directory entries from the difference

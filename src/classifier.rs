@@ -447,14 +447,12 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
     });
 
     match winner {
-        Some((category, score)) => {
-            ClassificationResult {
-                category,
-                confidence: score.total().min(1.0),
-                tier_used: score.decisive_tier.unwrap_or(Tier::Extension),
-                evidence: score.evidence,
-            }
-        }
+        Some((category, score)) => ClassificationResult {
+            category,
+            confidence: score.total().min(1.0),
+            tier_used: score.decisive_tier.unwrap_or(Tier::Extension),
+            evidence: score.evidence,
+        },
         None => ClassificationResult {
             category: "Misc".to_string(),
             confidence: 0.10,
@@ -516,13 +514,18 @@ mod tests {
         let ext = make_extracted("", b"%PDF-1.4", false);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents");
-        assert!(result.confidence >= 0.60, "confidence={}", result.confidence);
+        assert!(
+            result.confidence >= 0.60,
+            "confidence={}",
+            result.confidence
+        );
     }
 
     #[test]
     fn test_tier2_invoice_keywords() {
         let path = PathBuf::from("doc.pdf");
-        let text = "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
+        let text =
+            "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
         let ext = make_extracted(text, b"%PDF", true);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents/Invoices");
@@ -611,10 +614,14 @@ keywords = [{ word = "GST", weight = 3.0 }]
         let result = classify(&path, &ext, &config);
         assert!(result.confidence > 0.60);
         // Built-in "invoice" keyword should still work alongside user "GST"
-        let has_invoice_evidence = result.evidence.iter().any(|e| {
-            matches!(e, Evidence::KeywordMatch { keyword, .. } if keyword == "invoice")
-        });
-        assert!(has_invoice_evidence, "built-in keywords should not be replaced");
+        let has_invoice_evidence = result
+            .evidence
+            .iter()
+            .any(|e| matches!(e, Evidence::KeywordMatch { keyword, .. } if keyword == "invoice"));
+        assert!(
+            has_invoice_evidence,
+            "built-in keywords should not be replaced"
+        );
     }
 
     #[test]

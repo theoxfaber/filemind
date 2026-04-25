@@ -34,11 +34,7 @@ pub struct AuditReport {
 /// 1. Re-classify with the current classifier (keywords may have changed)
 /// 2. Compare new category to stored category
 /// 3. Flag as drift if different AND new_confidence > stored_confidence + threshold
-pub fn run_audit(
-    manifest: &Manifest,
-    config: &Arc<Config>,
-    min_drift: f32,
-) -> Result<AuditReport> {
+pub fn run_audit(manifest: &Manifest, config: &Arc<Config>, min_drift: f32) -> Result<AuditReport> {
     let all_files = manifest.all_files()?;
     let mut high = 0usize;
     let mut medium = 0usize;
@@ -75,9 +71,9 @@ pub fn run_audit(
                 .evidence
                 .iter()
                 .filter_map(|e| match e {
-                    classifier::Evidence::KeywordMatch {
-                        keyword, count, ..
-                    } => Some(format!("\"{}\" ×{}", keyword, count)),
+                    classifier::Evidence::KeywordMatch { keyword, count, .. } => {
+                        Some(format!("\"{}\" ×{}", keyword, count))
+                    }
                     _ => None,
                 })
                 .collect::<Vec<_>>()
@@ -131,14 +127,11 @@ pub fn apply_audit(
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
         let dest_dir = output_dir.join(&drift.new_category);
-        let dest = match organizer::resolve_destination(
-            &dest_dir,
-            filename,
-            &config.general.conflict,
-        ) {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
+        let dest =
+            match organizer::resolve_destination(&dest_dir, filename, &config.general.conflict) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
 
         if organizer::move_file(&src, &dest).is_ok() {
             moved += 1;

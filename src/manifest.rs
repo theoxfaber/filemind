@@ -55,8 +55,9 @@ impl Manifest {
 
     /// Run DDL migrations to ensure schema is up to date.
     fn migrate(&self) -> Result<()> {
-        self.conn.execute_batch(
-            "
+        self.conn
+            .execute_batch(
+                "
             CREATE TABLE IF NOT EXISTS sessions (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp   TEXT    NOT NULL,
@@ -82,8 +83,8 @@ impl Manifest {
             CREATE INDEX IF NOT EXISTS idx_files_session   ON files(session_id);
             CREATE INDEX IF NOT EXISTS idx_files_category  ON files(category);
             ",
-        )
-        .map_err(FileMindError::Database)
+            )
+            .map_err(FileMindError::Database)
     }
 
     /// Returns `true` if a file with `md5` has already been organized.
@@ -277,31 +278,36 @@ impl Manifest {
 
     /// Load aggregate stats for the stats command.
     pub fn aggregate_stats(&self) -> Result<AggregateStats> {
-        let total_files: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM files",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
-        let total_size: i64 = self.conn.query_row(
-            "SELECT COALESCE(SUM(file_size), 0) FROM files",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
-        let session_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM sessions",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
-        let avg_confidence: f64 = self.conn.query_row(
-            "SELECT COALESCE(AVG(confidence), 0) FROM files",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0.0);
-        let oldest_session: Option<String> = self.conn.query_row(
-            "SELECT timestamp FROM sessions ORDER BY id ASC LIMIT 1",
-            [],
-            |row| row.get(0),
-        ).ok();
+        let total_files: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+            .unwrap_or(0);
+        let total_size: i64 = self
+            .conn
+            .query_row("SELECT COALESCE(SUM(file_size), 0) FROM files", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+        let session_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap_or(0);
+        let avg_confidence: f64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(AVG(confidence), 0) FROM files",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0.0);
+        let oldest_session: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT timestamp FROM sessions ORDER BY id ASC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
 
         Ok(AggregateStats {
             total_files,

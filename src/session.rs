@@ -211,9 +211,7 @@ mod tests {
         let manifest = Manifest::open(dir.path()).unwrap();
 
         // Create a session and file
-        let sid = manifest
-            .new_session(dir.path(), dir.path())
-            .unwrap();
+        let sid = manifest.new_session(dir.path(), dir.path()).unwrap();
         let src = dir.path().join("original.txt");
         let dest_dir = dir.path().join("organized");
         std::fs::create_dir_all(&dest_dir).unwrap();
@@ -248,9 +246,7 @@ mod tests {
     fn test_undo_checksum_mismatch() {
         let dir = TempDir::new().unwrap();
         let manifest = Manifest::open(dir.path()).unwrap();
-        let sid = manifest
-            .new_session(dir.path(), dir.path())
-            .unwrap();
+        let sid = manifest.new_session(dir.path(), dir.path()).unwrap();
 
         let src = dir.path().join("original.txt");
         let dest = dir.path().join("organized").join("original.txt");
@@ -281,9 +277,7 @@ mod tests {
     fn test_undo_missing_file() {
         let dir = TempDir::new().unwrap();
         let manifest = Manifest::open(dir.path()).unwrap();
-        let sid = manifest
-            .new_session(dir.path(), dir.path())
-            .unwrap();
+        let sid = manifest.new_session(dir.path(), dir.path()).unwrap();
 
         let entry = crate::manifest::NewEntry {
             session_id: sid,
