@@ -154,6 +154,9 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let manifest = Manifest::open(dir.path()).unwrap();
         let result = undo_session(&manifest, 9999);
-        assert!(matches!(result, Err(FileMindError::SessionNotFound { id: 9999 })));
+        assert!(matches!(
+            result,
+            Err(FileMindError::SessionNotFound { id: 9999 })
+        ));
     }
 }

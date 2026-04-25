@@ -225,10 +225,7 @@ keywords = [
         assert_eq!(cfg.general.concurrency, 8);
         assert_eq!(cfg.general.conflict, ConflictStrategy::Skip);
         let inv = cfg.categories.get("invoices").expect("no invoices key");
-        assert_eq!(
-            inv.output_folder.as_deref(),
-            Some("Finance/Invoices")
-        );
+        assert_eq!(inv.output_folder.as_deref(), Some("Finance/Invoices"));
         let kws = inv.keywords.as_ref().unwrap();
         assert_eq!(kws.len(), 2);
         assert_eq!(kws[0].word, "GST");

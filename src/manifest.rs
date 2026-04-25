@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FileMindError, Result};
@@ -169,8 +169,7 @@ impl Manifest {
                 status: row.get(5)?,
             })
         })?;
-        rows.map(|r| r.map_err(FileMindError::Database))
-            .collect()
+        rows.map(|r| r.map_err(FileMindError::Database)).collect()
     }
 
     /// Load all file entries for `session_id`.
@@ -183,9 +182,7 @@ impl Manifest {
         )?;
         let rows = stmt.query_map(params![session_id], |row| {
             let ts: String = row.get(9)?;
-            let organized_at = ts
-                .parse::<DateTime<Utc>>()
-                .unwrap_or_else(|_| Utc::now());
+            let organized_at = ts.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now());
             Ok(ManifestEntry {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
@@ -199,8 +196,7 @@ impl Manifest {
                 organized_at,
             })
         })?;
-        rows.map(|r| r.map_err(FileMindError::Database))
-            .collect()
+        rows.map(|r| r.map_err(FileMindError::Database)).collect()
     }
 
     /// Load category summary: (category, count, avg_confidence).
@@ -211,10 +207,13 @@ impl Manifest {
              FROM files GROUP BY category ORDER BY cnt DESC",
         )?;
         let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, f64>(2)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, f64>(2)?,
+            ))
         })?;
-        rows.map(|r| r.map_err(FileMindError::Database))
-            .collect()
+        rows.map(|r| r.map_err(FileMindError::Database)).collect()
     }
 
     /// Delete all file records for `session_id` (used by undo).

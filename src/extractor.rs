@@ -44,11 +44,11 @@ pub fn extract(path: &Path) -> Result<Extracted> {
         "pdf" => extract_pdf(path),
         // All UTF-8 text variants share the same reader
         "txt" | "md" | "markdown" | "rst" | "log" | "org" => read_text(path),
-        "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "go" | "java" | "c" | "cpp"
-        | "h" | "hpp" | "cs" | "rb" | "swift" | "kt" | "scala" | "r" | "lua"
-        | "php" | "sh" | "bash" | "zsh" | "fish" | "ps1" | "bat" => read_text(path),
-        "json" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf" | "xml"
-        | "csv" | "tsv" | "html" | "htm" | "css" | "sql" => read_text(path),
+        "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "go" | "java" | "c" | "cpp" | "h" | "hpp"
+        | "cs" | "rb" | "swift" | "kt" | "scala" | "r" | "lua" | "php" | "sh" | "bash" | "zsh"
+        | "fish" | "ps1" | "bat" => read_text(path),
+        "json" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf" | "xml" | "csv" | "tsv"
+        | "html" | "htm" | "css" | "sql" => read_text(path),
         _ => {
             // Try to read as UTF-8 anyway; silently return empty on failure
             read_text_optional(path)
@@ -152,7 +152,8 @@ mod tests {
     fn extract_binary_returns_empty() {
         let mut f = NamedTempFile::with_suffix(".bin").unwrap();
         // Write clearly binary data
-        f.write_all(&[0x00, 0x01, 0x02, 0x03, 0xff, 0xfe, 0xfd]).unwrap();
+        f.write_all(&[0x00, 0x01, 0x02, 0x03, 0xff, 0xfe, 0xfd])
+            .unwrap();
         let result = extract(f.path()).unwrap();
         // May or may not have text — just should not panic
         let _ = result;

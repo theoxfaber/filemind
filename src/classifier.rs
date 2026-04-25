@@ -96,29 +96,35 @@ static EXT_MAP: Lazy<HashMap<&'static str, (&'static str, f32)>> = Lazy::new(|| 
     }
     // Images
     for ext in &[
-        "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg",
-        "heic", "heif", "raw", "cr2", "nef", "arw", "dng", "ico",
+        "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg", "heic", "heif", "raw",
+        "cr2", "nef", "arw", "dng", "ico",
     ] {
         m.insert(*ext, ("Images", 0.70_f32));
     }
     // Videos
-    for ext in &["mp4", "avi", "mov", "mkv", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mts"] {
+    for ext in &[
+        "mp4", "avi", "mov", "mkv", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mts",
+    ] {
         m.insert(*ext, ("Videos", 0.75_f32));
     }
     // Audio
-    for ext in &["mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus", "aiff", "mid"] {
+    for ext in &[
+        "mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus", "aiff", "mid",
+    ] {
         m.insert(*ext, ("Audio", 0.75_f32));
     }
     // Source code
     for ext in &[
-        "rs", "py", "js", "ts", "jsx", "tsx", "go", "java", "c", "cpp", "h",
-        "hpp", "cs", "rb", "swift", "kt", "scala", "r", "lua", "php", "sh",
-        "bash", "zsh", "fish", "ps1", "bat", "gradle", "cmake",
+        "rs", "py", "js", "ts", "jsx", "tsx", "go", "java", "c", "cpp", "h", "hpp", "cs", "rb",
+        "swift", "kt", "scala", "r", "lua", "php", "sh", "bash", "zsh", "fish", "ps1", "bat",
+        "gradle", "cmake",
     ] {
         m.insert(*ext, ("Code", 0.80_f32));
     }
     // Data / config
-    for ext in &["json", "yaml", "yml", "toml", "xml", "csv", "tsv", "parquet", "avro"] {
+    for ext in &[
+        "json", "yaml", "yml", "toml", "xml", "csv", "tsv", "parquet", "avro",
+    ] {
         m.insert(*ext, ("Data", 0.65_f32));
     }
     // Archives
@@ -148,55 +154,231 @@ pub struct BuiltinKw {
 pub static BUILTIN_KEYWORDS: Lazy<Vec<BuiltinKw>> = Lazy::new(|| {
     vec![
         // Invoices / Finance
-        BuiltinKw { category: "Documents/Invoices", word: "invoice",      weight: 3.0 },
-        BuiltinKw { category: "Documents/Invoices", word: "total due",    weight: 2.5 },
-        BuiltinKw { category: "Documents/Invoices", word: "bill to",      weight: 2.5 },
-        BuiltinKw { category: "Documents/Invoices", word: "amount",       weight: 1.5 },
-        BuiltinKw { category: "Documents/Invoices", word: "receipt",      weight: 2.0 },
-        BuiltinKw { category: "Documents/Invoices", word: "payment",      weight: 1.5 },
-        BuiltinKw { category: "Documents/Invoices", word: "subtotal",     weight: 2.0 },
-        BuiltinKw { category: "Documents/Invoices", word: "tax",          weight: 1.0 },
-        BuiltinKw { category: "Documents/Invoices", word: "billed",       weight: 1.5 },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "invoice",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "total due",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "bill to",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "amount",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "receipt",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "payment",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "subtotal",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "tax",
+            weight: 1.0,
+        },
+        BuiltinKw {
+            category: "Documents/Invoices",
+            word: "billed",
+            weight: 1.5,
+        },
         // Medical
-        BuiltinKw { category: "Documents/Medical", word: "diagnosis",     weight: 3.0 },
-        BuiltinKw { category: "Documents/Medical", word: "prescription",  weight: 3.0 },
-        BuiltinKw { category: "Documents/Medical", word: "patient",       weight: 2.5 },
-        BuiltinKw { category: "Documents/Medical", word: "dosage",        weight: 2.0 },
-        BuiltinKw { category: "Documents/Medical", word: "mg",            weight: 1.0 },
-        BuiltinKw { category: "Documents/Medical", word: "clinic",        weight: 2.0 },
-        BuiltinKw { category: "Documents/Medical", word: "physician",     weight: 2.5 },
-        BuiltinKw { category: "Documents/Medical", word: "symptom",       weight: 2.0 },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "diagnosis",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "prescription",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "patient",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "dosage",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "mg",
+            weight: 1.0,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "clinic",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "physician",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Medical",
+            word: "symptom",
+            weight: 2.0,
+        },
         // Legal
-        BuiltinKw { category: "Documents/Legal", word: "agreement",       weight: 3.0 },
-        BuiltinKw { category: "Documents/Legal", word: "whereas",         weight: 3.0 },
-        BuiltinKw { category: "Documents/Legal", word: "party",           weight: 1.5 },
-        BuiltinKw { category: "Documents/Legal", word: "liability",       weight: 2.5 },
-        BuiltinKw { category: "Documents/Legal", word: "jurisdiction",    weight: 3.0 },
-        BuiltinKw { category: "Documents/Legal", word: "contract",        weight: 2.5 },
-        BuiltinKw { category: "Documents/Legal", word: "shall",           weight: 1.0 },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "agreement",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "whereas",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "party",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "liability",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "jurisdiction",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "contract",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Legal",
+            word: "shall",
+            weight: 1.0,
+        },
         // Finance
-        BuiltinKw { category: "Finance", word: "portfolio",               weight: 2.5 },
-        BuiltinKw { category: "Finance", word: "dividend",                weight: 3.0 },
-        BuiltinKw { category: "Finance", word: "equity",                  weight: 2.0 },
-        BuiltinKw { category: "Finance", word: "balance sheet",           weight: 3.0 },
-        BuiltinKw { category: "Finance", word: "quarterly",               weight: 1.5 },
-        BuiltinKw { category: "Finance", word: "revenue",                 weight: 2.0 },
+        BuiltinKw {
+            category: "Finance",
+            word: "portfolio",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Finance",
+            word: "dividend",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Finance",
+            word: "equity",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Finance",
+            word: "balance sheet",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Finance",
+            word: "quarterly",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Finance",
+            word: "revenue",
+            weight: 2.0,
+        },
         // Code (text-based signal)
-        BuiltinKw { category: "Code", word: "fn ",                        weight: 2.0 },
-        BuiltinKw { category: "Code", word: "struct ",                    weight: 2.0 },
-        BuiltinKw { category: "Code", word: "impl ",                      weight: 2.0 },
-        BuiltinKw { category: "Code", word: "import ",                    weight: 1.5 },
-        BuiltinKw { category: "Code", word: "def ",                       weight: 2.0 },
-        BuiltinKw { category: "Code", word: "#include",                   weight: 3.0 },
-        BuiltinKw { category: "Code", word: "function",                   weight: 1.5 },
-        BuiltinKw { category: "Code", word: "class ",                     weight: 1.5 },
-        BuiltinKw { category: "Code", word: "return",                     weight: 1.0 },
+        BuiltinKw {
+            category: "Code",
+            word: "fn ",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "struct ",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "impl ",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "import ",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "def ",
+            weight: 2.0,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "#include",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "function",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "class ",
+            weight: 1.5,
+        },
+        BuiltinKw {
+            category: "Code",
+            word: "return",
+            weight: 1.0,
+        },
         // Research / Academic
-        BuiltinKw { category: "Documents/Research", word: "abstract",     weight: 2.5 },
-        BuiltinKw { category: "Documents/Research", word: "bibliography", weight: 3.0 },
-        BuiltinKw { category: "Documents/Research", word: "hypothesis",   weight: 3.0 },
-        BuiltinKw { category: "Documents/Research", word: "methodology",  weight: 2.5 },
-        BuiltinKw { category: "Documents/Research", word: "references",   weight: 2.0 },
+        BuiltinKw {
+            category: "Documents/Research",
+            word: "abstract",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Research",
+            word: "bibliography",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Research",
+            word: "hypothesis",
+            weight: 3.0,
+        },
+        BuiltinKw {
+            category: "Documents/Research",
+            word: "methodology",
+            weight: 2.5,
+        },
+        BuiltinKw {
+            category: "Documents/Research",
+            word: "references",
+            weight: 2.0,
+        },
     ]
 });
 
@@ -219,7 +401,9 @@ fn detect_magic(bytes: &[u8]) -> Option<(&'static str, f32)> {
     if bytes.starts_with(b"GIF8") {
         return Some(("GIF image (GIF8)", 0.12));
     }
-    if bytes.starts_with(b"ID3") || (bytes.len() >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0) {
+    if bytes.starts_with(b"ID3")
+        || (bytes.len() >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)
+    {
         return Some(("MP3 audio (ID3 / sync bits)", 0.12));
     }
     if bytes.starts_with(b"fLaC") {
@@ -379,9 +563,7 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
                     entry.decisive_tier = Some(Tier::Content);
                 }
             }
-
         }
-
     }
 
     // ── Tier 3: Filename + path heuristics ────────────────────────────────────
@@ -395,21 +577,21 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
 
     let filename_patterns: &[(&str, &str, f32)] = &[
         // (pattern_substr, category, boost)
-        ("invoice",    "Documents/Invoices", 0.15),
-        ("receipt",    "Documents/Invoices", 0.12),
-        ("bill",       "Documents/Invoices", 0.10),
-        ("img_",       "Images",             0.08),
-        ("dsc_",       "Images",             0.08),
-        ("screenshot", "Images",             0.10),
-        ("photo",      "Images",             0.08),
-        ("readme",     "Code",               0.10),
-        ("makefile",   "Code",               0.15),
-        ("dockerfile", "Code",               0.15),
-        ("contract",   "Documents/Legal",    0.15),
-        ("agreement",  "Documents/Legal",    0.12),
-        ("report",     "Documents",          0.08),
-        ("resume",     "Documents",          0.10),
-        ("cv",         "Documents",          0.08),
+        ("invoice", "Documents/Invoices", 0.15),
+        ("receipt", "Documents/Invoices", 0.12),
+        ("bill", "Documents/Invoices", 0.10),
+        ("img_", "Images", 0.08),
+        ("dsc_", "Images", 0.08),
+        ("screenshot", "Images", 0.10),
+        ("photo", "Images", 0.08),
+        ("readme", "Code", 0.10),
+        ("makefile", "Code", 0.15),
+        ("dockerfile", "Code", 0.15),
+        ("contract", "Documents/Legal", 0.15),
+        ("agreement", "Documents/Legal", 0.12),
+        ("report", "Documents", 0.08),
+        ("resume", "Documents", 0.10),
+        ("cv", "Documents", 0.08),
     ];
 
     for (pattern, category, boost) in filename_patterns {
@@ -426,17 +608,17 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
 
     // Path segment signals (parent folder name hints)
     let path_signals: &[(&str, &str, f32)] = &[
-        ("invoice",  "Documents/Invoices", 0.10),
+        ("invoice", "Documents/Invoices", 0.10),
         ("invoices", "Documents/Invoices", 0.12),
-        ("medical",  "Documents/Medical",  0.12),
-        ("health",   "Documents/Medical",  0.10),
-        ("legal",    "Documents/Legal",    0.12),
-        ("photos",   "Images",             0.10),
-        ("pictures", "Images",             0.10),
-        ("videos",   "Videos",             0.10),
-        ("music",    "Audio",              0.10),
-        ("code",     "Code",               0.08),
-        ("src",      "Code",               0.06),
+        ("medical", "Documents/Medical", 0.12),
+        ("health", "Documents/Medical", 0.10),
+        ("legal", "Documents/Legal", 0.12),
+        ("photos", "Images", 0.10),
+        ("pictures", "Images", 0.10),
+        ("videos", "Videos", 0.10),
+        ("music", "Audio", 0.10),
+        ("code", "Code", 0.08),
+        ("src", "Code", 0.06),
     ];
 
     for (segment, category, boost) in path_signals {
@@ -457,9 +639,11 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
     }
 
     // ── Resolve winner ────────────────────────────────────────────────────────
-    let winner = scores
-        .into_iter()
-        .max_by(|a, b| a.1.total().partial_cmp(&b.1.total()).unwrap_or(std::cmp::Ordering::Equal));
+    let winner = scores.into_iter().max_by(|a, b| {
+        a.1.total()
+            .partial_cmp(&b.1.total())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     match winner {
         Some((category, score)) => ClassificationResult {
@@ -481,7 +665,11 @@ pub fn classify(path: &Path, extracted: &Extracted, config: &Config) -> Classifi
 fn magic_to_category(desc: &str) -> &'static str {
     if desc.contains("PDF") {
         "Documents"
-    } else if desc.contains("ZIP") || desc.contains("GZIP") || desc.contains("BZIP2") || desc.contains("XZ") {
+    } else if desc.contains("ZIP")
+        || desc.contains("GZIP")
+        || desc.contains("BZIP2")
+        || desc.contains("XZ")
+    {
         "Archives"
     } else if desc.contains("JPEG") || desc.contains("PNG") || desc.contains("GIF") {
         "Images"
@@ -497,16 +685,18 @@ fn magic_to_category(desc: &str) -> &'static str {
 /// Convert a user config key like `"invoices"` to a canonical category name.
 fn canonical_category_name(key: &str) -> String {
     match key.to_lowercase().as_str() {
-        "invoices"  => "Documents/Invoices".to_string(),
-        "medical"   => "Documents/Medical".to_string(),
-        "legal"     => "Documents/Legal".to_string(),
-        "research"  => "Documents/Research".to_string(),
-        "code"      => "Code".to_string(),
-        "finance"   => "Finance".to_string(),
+        "invoices" => "Documents/Invoices".to_string(),
+        "medical" => "Documents/Medical".to_string(),
+        "legal" => "Documents/Legal".to_string(),
+        "research" => "Documents/Research".to_string(),
+        "code" => "Code".to_string(),
+        "finance" => "Finance".to_string(),
         _ => {
             // Title-case the key as the category name
             let mut c = key.chars();
-            c.next().map(|f| f.to_uppercase().to_string() + c.as_str()).unwrap_or_default()
+            c.next()
+                .map(|f| f.to_uppercase().to_string() + c.as_str())
+                .unwrap_or_default()
         }
     }
 }
@@ -540,7 +730,8 @@ mod tests {
     #[test]
     fn invoice_keywords_boost_to_invoices() {
         let path = PathBuf::from("doc.pdf");
-        let text = "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
+        let text =
+            "Invoice #1234\nBill to: John Doe\nTotal due: $500\nPayment: card\nSubtotal: $480";
         let ext = make_extracted(text, b"%PDF", true);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents/Invoices");
@@ -560,7 +751,8 @@ mod tests {
     #[test]
     fn medical_keywords_detected() {
         let path = PathBuf::from("note.txt");
-        let text = "Patient: Alice Smith\nDiagnosis: Flu\nPrescription: 500mg\nClinic: City Hospital";
+        let text =
+            "Patient: Alice Smith\nDiagnosis: Flu\nPrescription: 500mg\nClinic: City Hospital";
         let ext = make_extracted(text, b"", true);
         let result = classify(&path, &ext, &Config::default());
         assert_eq!(result.category, "Documents/Medical");

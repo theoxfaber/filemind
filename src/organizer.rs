@@ -193,7 +193,8 @@ mod tests {
     fn rename_new_produces_unique_name() {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
-        let dest = resolve_destination(dir.path(), "file.txt", &ConflictStrategy::RenameNew).unwrap();
+        let dest =
+            resolve_destination(dir.path(), "file.txt", &ConflictStrategy::RenameNew).unwrap();
         assert_ne!(dest, dir.path().join("file.txt"));
         assert!(dest.to_string_lossy().contains("(1)"));
     }
@@ -202,7 +203,8 @@ mod tests {
     fn overwrite_returns_same_path() {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("file.txt"), b"existing").unwrap();
-        let dest = resolve_destination(dir.path(), "file.txt", &ConflictStrategy::Overwrite).unwrap();
+        let dest =
+            resolve_destination(dir.path(), "file.txt", &ConflictStrategy::Overwrite).unwrap();
         assert_eq!(dest, dir.path().join("file.txt"));
     }
 

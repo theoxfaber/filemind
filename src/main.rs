@@ -13,11 +13,9 @@ use colored::Colorize;
 
 use filemind::{
     config::Config,
-    engine::{PipelineOptions, run as engine_run},
+    engine::{run as engine_run, PipelineOptions},
     manifest::Manifest,
-    organizer,
-    session,
-    ui,
+    organizer, session, ui,
 };
 
 // ─── CLI definition ───────────────────────────────────────────────────────────
@@ -197,11 +195,20 @@ async fn main() -> anyhow::Result<()> {
             }
 
             if dry_run {
-                println!("{}", "⚡ DRY-RUN mode — no files will be written.\n".yellow().bold());
+                println!(
+                    "{}",
+                    "⚡ DRY-RUN mode — no files will be written.\n"
+                        .yellow()
+                        .bold()
+                );
             }
 
             let n = engine_run(opts, Arc::clone(&config)).await?;
-            println!("\n{} {} files organized.", "✅".green(), n.to_string().yellow().bold());
+            println!(
+                "\n{} {} files organized.",
+                "✅".green(),
+                n.to_string().yellow().bold()
+            );
         }
 
         Commands::Watch { dir } => {
@@ -240,7 +247,13 @@ async fn main() -> anyhow::Result<()> {
                 if entries.is_empty() {
                     println!("{}", "No files found for that session.".yellow());
                 } else {
-                    println!("\n{}", format!(" Session {id} — {} files ", entries.len()).black().on_cyan().bold());
+                    println!(
+                        "\n{}",
+                        format!(" Session {id} — {} files ", entries.len())
+                            .black()
+                            .on_cyan()
+                            .bold()
+                    );
                     for e in &entries {
                         println!(
                             "  {} {} → {} [{:.0}%]",
@@ -277,9 +290,7 @@ async fn main() -> anyhow::Result<()> {
                 let extracted = filemind::extractor::extract(&path)?;
                 let result = filemind::classifier::classify(&path, &extracted, &config);
                 ui::print_explain(
-                    path.file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or(&file),
+                    path.file_name().and_then(|n| n.to_str()).unwrap_or(&file),
                     &result.category,
                     result.confidence,
                     &result.tier_used,

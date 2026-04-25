@@ -11,7 +11,7 @@ use colored::Colorize;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use filemind::config::Config;
-use filemind::engine::{PipelineOptions, run as engine_run};
+use filemind::engine::{run as engine_run, PipelineOptions};
 use filemind::error::{FileMindError, Result};
 
 /// Watch `dir` indefinitely, organizing new files as they appear.
@@ -62,10 +62,7 @@ pub async fn watch(dir: &Path, config: Arc<Config>) -> Result<()> {
 
         // Create a synthetic single-file input dir pointing at the parent
         // and let the engine skip all non-matching files via the dedup check.
-        let parent = new_file
-            .parent()
-            .unwrap_or(dir)
-            .to_path_buf();
+        let parent = new_file.parent().unwrap_or(dir).to_path_buf();
 
         let opts = PipelineOptions {
             input_dir: parent,

@@ -27,10 +27,7 @@ pub fn print_banner() {
         "🧠 Deterministic file organizer".bold(),
         "— v3.0 · zero AI · zero network · single binary".dimmed()
     );
-    println!(
-        "  {}",
-        "github.com/theoxfaber/filemind".dimmed()
-    );
+    println!("  {}", "github.com/theoxfaber/filemind".dimmed());
     println!();
 }
 
@@ -55,7 +52,10 @@ pub fn print_explain(
     );
     for ev in evidence {
         match ev {
-            Evidence::Extension { ext, base_confidence } => {
+            Evidence::Extension {
+                ext,
+                base_confidence,
+            } => {
                 eprintln!(
                     "    {}  .{} extension  {}",
                     "tier-1".dimmed(),
@@ -124,10 +124,7 @@ pub fn print_sessions(sessions: &[SessionRow]) {
         println!("{}", "No sessions found.".yellow());
         return;
     }
-    println!(
-        "\n{}",
-        " 📋 FileMind Sessions ".black().on_cyan().bold()
-    );
+    println!("\n{}", " 📋 FileMind Sessions ".black().on_cyan().bold());
     println!(
         "  {:<5} {:<30} {:<10} {:<12} {}",
         "ID".bold(),
@@ -163,7 +160,10 @@ pub fn print_status(manifest: &Manifest) {
         Err(e) => eprintln!("Error reading manifest: {e}"),
         Ok(rows) => {
             if rows.is_empty() {
-                println!("{}", "No files organized yet. Run `filemind organize` first.".yellow());
+                println!(
+                    "{}",
+                    "No files organized yet. Run `filemind organize` first.".yellow()
+                );
                 return;
             }
             let total: i64 = rows.iter().map(|(_, c, _)| c).sum();
@@ -196,7 +196,10 @@ pub fn print_rules() {
 
     let mut by_cat: BTreeMap<&str, Vec<(&str, f32)>> = BTreeMap::new();
     for kw in BUILTIN_KEYWORDS.iter() {
-        by_cat.entry(kw.category).or_default().push((kw.word, kw.weight));
+        by_cat
+            .entry(kw.category)
+            .or_default()
+            .push((kw.word, kw.weight));
     }
 
     println!("\n{}", " 📜 Active Rules ".black().on_cyan().bold());
