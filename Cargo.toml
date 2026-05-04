@@ -2,7 +2,7 @@
 name = "filemind"
 version = "3.0.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Production-grade, deterministic, content-aware file organizer CLI — zero AI, zero network, single binary"
 license = "MIT"
 repository = "https://github.com/theoxfaber/filemind"
