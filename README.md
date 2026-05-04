@@ -7,6 +7,7 @@ Automatically categorizes and organizes files based on actual content, not just 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
 ![Language](https://img.shields.io/badge/Language-Rust-orange)
 ![License](https://img.shields.io/badge/License-MIT-blue)
+[![Crates.io](https://img.shields.io/crates/v/filemind.svg)](https://crates.io/crates/filemind)
 
 ---
 
